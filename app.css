@@ -338,7 +338,84 @@ table.report { min-width: 980px; }
 @media (max-width: 860px) {
   .dash-grid { grid-template-columns: 1fr; }
   .tabbar { grid-template-columns: repeat(5, 1fr) !important; }
-  .figure-value { font-size: 1.5rem; }
-  table.report { min-width: 0; }
-  .scroll { overflow: visible; }
 }
+
+/* ---- Phones: fit the screen with no sideways scrolling, and use the space well ---- */
+.period-select { display: none; }
+@media (max-width: 860px) {
+  body { font-size: .875rem; }
+  .shell, .content, main { min-width: 0; max-width: 100%; }
+  main { padding: 14px 14px calc(88px + env(safe-area-inset-bottom)); }
+  p, li, dd, td, th, h2, h3 { overflow-wrap: break-word; }
+  .page-head { flex-wrap: wrap; gap: 8px; }
+
+  .period { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; align-items: end; margin-bottom: 4px; }
+  .period .seg { display: none; }
+  .period .period-select { display: block; grid-column: 1 / -1; width: 100%; }
+  .period .inline-field { min-width: 0; }
+  .period .inline-field input { width: 100%; min-width: 0; }
+  .period-note { margin: 6px 0 12px; font-size: .75rem; }
+
+  .figures, .figures.small { grid-template-columns: repeat(2, minmax(0, 1fr)); margin-bottom: 16px; }
+  .figure { min-width: 0; padding: 11px 12px; }
+  .figure-value { font-size: 1.25rem; overflow-wrap: anywhere; }
+  .figure-label, .figure-sub { font-size: .6875rem; }
+
+  .dash-grid { gap: 14px; margin-bottom: 14px; }
+  .dash-grid > *, .cols > * { min-width: 0; }
+  .dash-panel { padding: 12px 14px; }
+  .dash-panel.wide { margin-bottom: 14px; }
+  ul.attn a { grid-template-columns: 1fr; gap: 3px; }
+  .attn-due { text-align: left; white-space: normal; }
+
+  .filters { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; align-items: center; }
+  .filters > .seg, .filters > input[type="search"], .filters > .check { grid-column: 1 / -1; }
+  .filters select, .filters input { width: 100%; min-width: 0; }
+  .filters label.inline { min-width: 0; }
+  .seg { max-width: 100%; overflow-x: auto; flex-wrap: nowrap; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+  .seg::-webkit-scrollbar { display: none; }
+  .seg-btn { flex: none; }
+
+  .facts > div { grid-template-columns: minmax(0, 42%) minmax(0, 1fr); gap: 10px; padding: 7px 0; }
+
+  /* tables that stay tables on a phone (reports, the driver summary) */
+  .grid.keep { display: table; width: 100%; border: 0; background: var(--surface); }
+  .grid.keep thead { display: table-header-group; }
+  .grid.keep tbody { display: table-row-group; border: 0; background: none; }
+  .grid.keep tfoot { display: table-footer-group; }
+  .grid.keep tr { display: table-row; margin: 0; border: 0; border-radius: 0; overflow: visible; background: none; }
+  .grid.keep th, .grid.keep td { display: table-cell; padding: 8px 10px; text-align: left; }
+  .grid.keep td::before { content: none; }
+  .grid.keep th.num, .grid.keep td.num { text-align: right; }
+  .grid.keep thead th { font-size: .6875rem; }
+  table.report.grid.keep { min-width: 900px; }
+  .scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); }
+}
+
+/* ---- Availability chart ---- */
+.avail-panel .drivers-note { margin: 0 0 10px; }
+.chart-legend { display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 0 0 8px; font-size: .75rem; }
+.chart-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.swatch { display: inline-block; width: 12px; height: 12px; border-radius: 2px; border: 1px solid rgba(0, 0, 0, .18); }
+.sw-un-van { background: #FF0066; }
+.sw-un-hgv { background: repeating-linear-gradient(45deg, rgba(255, 255, 255, .55) 0 2px, transparent 2px 5px), #8A1538; }
+.sw-av-van { background: #C9D3DB; }
+.sw-av-hgv { background: repeating-linear-gradient(45deg, rgba(255, 255, 255, .55) 0 2px, transparent 2px 5px), #8FA0AD; }
+.avail-chart { width: 100%; min-height: 200px; }
+.avail-chart svg { display: block; max-width: 100%; height: auto; }
+.avail-chart .seg-un-van { fill: #FF0066; }
+.avail-chart .seg-un-hgv { fill: #8A1538; }
+.avail-chart .seg-av-van { fill: #C9D3DB; }
+.avail-chart .seg-av-hgv { fill: #8FA0AD; }
+.avail-chart .grid-line { stroke: #E3E3E3; stroke-width: 1; }
+.avail-chart .axis-text { font: 400 10px var(--font-ui); fill: #555; }
+.avail-chart .bar { cursor: pointer; outline: none; }
+.avail-chart .bar .hit { fill: transparent; }
+.avail-chart .bar:hover .hit, .avail-chart .bar.selected .hit { fill: rgba(46, 46, 46, .08); }
+.avail-chart .bar:focus-visible .hit { stroke: var(--brand); stroke-width: 2; fill: rgba(46, 46, 46, .06); }
+.chart-detail { min-height: 2.8em; margin: 8px 0 0; font-size: .8125rem; color: var(--ink-2); }
+.chart-summary { margin: 4px 0 0; font-size: .875rem; }
+.chart-numbers { margin-top: 12px; }
+.chart-numbers summary { cursor: pointer; font-size: .8125rem; font-weight: 700; padding: 4px 0; }
+.chart-numbers .scroll { margin-top: 8px; }
+@media (max-width: 860px) { .chart-legend { gap: 4px 12px; font-size: .6875rem; } .chart-detail { font-size: .75rem; } }

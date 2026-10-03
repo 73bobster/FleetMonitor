@@ -121,7 +121,7 @@ export async function reportsView(main, params, query) {
       <p class="muted period-note">${info[2]}</p>
       <div class="report-actions"><button class="btn btn-primary" data-action="excel">Download Excel</button><button class="btn" data-action="pdf">Download PDF</button></div>
       <div class="figures small">${model.summary.map(([l, v]) => html`<div class="figure"><span class="figure-value">${v}</span><span class="figure-label">${l}</span></div>`)}</div>
-      ${model.rows.length ? html`<div class="scroll"><table class="grid report"><thead><tr>${model.columns.map((c) => html`<th class="${money(c) ? 'num' : ''}">${c.label}</th>`)}</tr></thead><tbody>
+      ${model.rows.length ? html`<div class="scroll"><table class="grid keep report"><thead><tr>${model.columns.map((c) => html`<th class="${money(c) ? 'num' : ''}">${c.label}</th>`)}</tr></thead><tbody>
         ${model.rows.map((r) => html`<tr>${model.columns.map((c) => html`<td data-label="${c.label}" class="${money(c) ? 'num' : ''}">${c.key === 'vehicle' && r.vehicle_id ? html`<a class="plate-link" href="#/vehicles/${r.vehicle_id}">${plate(r.vehicle)}</a>` : (c.key === 'date' && r.id ? html`<a href="#/incidents/${r.id}">${cellHtml(c, r[c.key])}</a>` : cellHtml(c, r[c.key]))}</td>`)}</tr>`)}
       </tbody>${model.totals ? html`<tfoot><tr>${model.columns.map((c) => html`<td class="${money(c) ? 'num' : ''} totals">${cellHtml(c, model.totals[c.key])}</td>`)}</tr></tfoot>` : ''}</table></div>`
         : emptyHtml('Nothing to report', 'No records fall in this period. Try a longer period.')}`);

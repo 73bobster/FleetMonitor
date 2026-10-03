@@ -62,11 +62,9 @@ export const auth = {
 
 // ---- Organisation context -----------------------------------------------
 export async function loadMemberships(userId) {
-  const mem = ok(await sb.from('memberships').select('*').eq('user_id', userId).eq('status', 'active'));
-  if (!mem.length) return [];
-  const orgs = ok(await sb.from('organisations').select('*').in('id', mem.map((m) => m.organisation_id)));
-  const byId = new Map(orgs.map((o) => [o.id, o]));
-  return mem.map((m) => ({ ...m, organisation: byId.get(m.organisation_id) })).filter((m) => m.organisation);
+  // one request: each membership comes back with its organisation
+  const rows = ok(await sb.from('memberships').select('*, organisation:organisations(*)').eq('user_id', userId).eq('status', 'active'));
+  return rows.filter((m) => m.organisation);
 }
 export const acceptInvitation = async (token) => ok(await sb.rpc('accept_invitation', { p_token: token }));
 // brand.logo_url is a full address; brand.logo_path is a file in the org-branding storage bucket.
@@ -78,8 +76,13 @@ export function logoUrl(brand) {
 }
 
 // ---- Tasks and compliance ------------------------------------------------
-export const listTasks = async () =>
-  all(() => sb.from('compliance_tasks').select('*').eq('organisation_id', org()).order('due_date', { ascending: true, nullsFirst: false }).order('source_id').order('state_key'));
+export const listTasks = async ({ vehicleId, driverId } = {}) =>
+  all(() => {
+    let q = sb.from('compliance_tasks').select('*').eq('organisation_id', org());
+    if (vehicleId) q = q.eq('vehicle_id', vehicleId);
+    if (driverId) q = q.eq('driver_id', driverId);
+    return q.order('due_date', { ascending: true, nullsFirst: false }).order('source_id').order('state_key');
+  });
 export const listComplianceTypes = async () =>
   ok(await sb.from('compliance_types').select('*').eq('organisation_id', org()).order('sort_order'));
 

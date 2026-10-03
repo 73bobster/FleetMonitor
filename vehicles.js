@@ -180,11 +180,10 @@ const TABS = [
 
 export async function vehicleDetail(main, { id }, query) {
   mount(main, loadingHtml());
-  const v = await api.getVehicle(id);
+  const [v, garages] = await Promise.all([api.getVehicle(id), api.listGarages()]);
   if (!v) { mount(main, emptyHtml('Vehicle not found', 'It may have been removed.', html`<p><a class="btn" href="#/vehicles">Back to vehicles</a></p>`)); return; }
   const tab = TABS.find((t) => t.id === query.tab && (!t.when || t.when())) ? query.tab : 'overview';
   const disposed = v.status === 'disposed';
-  const garages = await api.listGarages();
   const av = availability(v);
   const gname = garages.find((g) => g.id === v.unavailable_garage_id)?.name || 'a garage';
   const lateBack = v.unavailable_expected_return && v.unavailable_expected_return < todayStr();
@@ -259,7 +258,7 @@ const TAB_RENDER = {
 
   async compliance(body, v) {
     const ctx = { vehicles: new Map([[v.id, v]]), drivers: new Map() };
-    const load = async () => (await api.listTasks()).filter((t) => t.vehicle_id === v.id);
+    const load = async () => (await api.listTasks({ vehicleId: v.id })).filter((t) => t.vehicle_id === v.id);
     let tasks = await load();
     const byKey = (k) => tasks.find((t) => taskKey(t) === k);
     const draw = () => mount(body, tasks.length ? taskTable(tasks)

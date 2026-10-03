@@ -29,6 +29,7 @@ export const inPeriod = (date, p) => !!date && date >= p.from && date <= p.to;
 // Period controls: preset buttons and two dates. Calls onChange(period) when anything changes.
 export function periodControlsHtml(p) {
   return html`<div class="period" role="group" aria-label="Reporting period">
+    <select class="period-select" id="p-preset" aria-label="Reporting period">${PRESETS.map(([k, l]) => html`<option value="${k}" ${p.preset === k ? 'selected' : ''}>${l}</option>`)}<option value="custom" ${p.preset === 'custom' ? 'selected' : ''}>Custom dates</option></select>
     <div class="seg">${PRESETS.map(([k, l]) => html`<button type="button" class="seg-btn" data-action="preset" data-preset="${k}" aria-pressed="${String(p.preset === k)}">${l}</button>`)}</div>
     <div class="field inline-field"><label for="p-from">From</label><input type="date" id="p-from" value="${p.from}" max="${p.to}"></div>
     <div class="field inline-field"><label for="p-to">To</label><input type="date" id="p-to" value="${p.to}" min="${p.from}"></div>
@@ -42,6 +43,7 @@ export function wirePeriod(root, p, onChange) {
     e.preventDefault(); apply({ preset: b.dataset.preset, ...presetRange(b.dataset.preset) });
   };
   root.addEventListener('click', root._periodClick);
+  root.querySelector('#p-preset')?.addEventListener('change', (e) => { if (e.target.value !== 'custom') apply({ preset: e.target.value, ...presetRange(e.target.value) }); });
   const from = root.querySelector('#p-from'); const to = root.querySelector('#p-to');
   const custom = () => { if (from.value && to.value && from.value <= to.value) apply({ preset: 'custom', from: from.value, to: to.value }); };
   from.addEventListener('change', custom); to.addEventListener('change', custom);

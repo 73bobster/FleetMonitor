@@ -370,7 +370,7 @@ const TAB_RENDER = {
 
   async compliance(body, d) {
     const ctx = { vehicles: new Map(), drivers: new Map([[d.id, d]]) };
-    const load = async () => (await api.listTasks()).filter((t) => t.driver_id === d.id);
+    const load = async () => (await api.listTasks({ driverId: d.id })).filter((t) => t.driver_id === d.id);
     let tasks = await load();
     const byKey = (k) => tasks.find((t) => taskKey(t) === k);
     const draw = () => {
