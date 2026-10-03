@@ -1,19 +1,19 @@
 // Drivers: list, add or edit, and the detail page with tabs.
 // Date of birth and licence details come from the restricted driver_sensitive table and licence_checks,
 // which the database only returns to fleet managers, fleet admins and superusers.
-import * as api from '../api.js';
-import { can } from '../state.js';
+import * as api from './api.js';
+import { can } from './state.js';
 import {
   html, mount, on, plate, pill, fieldsHtml, readForm, openModal, toast, loadingHtml, emptyHtml, errorHtml,
   fmtDate, fmtDateShort, todayStr,
-} from '../ui.js';
+} from './ui.js';
 import {
   EMPLOYMENT_LABEL, LICENCE_STATUS_LABEL, LICENCE_METHOD_LABEL, BLOCKING_LICENCE, driverName, worstStatus, taskKey, vehicleTitle,
-} from '../domain.js';
-import { openTaskPanel } from '../actions.js';
-import { navigate } from '../router.js';
+} from './domain.js';
+import { openTaskPanel } from './actions.js';
+import { navigate } from './router.js';
 import { historyList } from './history.js';
-import { dueText } from '../ui.js';
+import { dueText } from './ui.js';
 
 const opts = (o) => Object.entries(o);
 const licenceClass = (s) => (s === 'valid' ? 'upcoming' : BLOCKING_LICENCE.includes(s) ? 'overdue' : 'due_soon');

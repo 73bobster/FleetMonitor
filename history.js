@@ -1,5 +1,5 @@
 // Renders audit-log entries as a readable change history (admins only; the database hides it from others).
-import { html, fmtDateTime } from '../ui.js';
+import { html, fmtDateTime } from './ui.js';
 
 const label = (f) => String(f).replace(/_/g, ' ');
 const show = (v) => (v === null || v === undefined || v === '' ? 'empty' : String(Array.isArray(v) ? v.join(', ') : v).slice(0, 70));

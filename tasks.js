@@ -1,10 +1,10 @@
 // Tasks: everything coming due, grouped by urgency, with the actions to deal with it.
-import * as api from '../api.js';
-import { can } from '../state.js';
-import { html, mount, on, pill, fmtDate, dueText, loadingHtml, emptyHtml, plural } from '../ui.js';
-import { STATUS_LABEL, STATUS_ORDER, driverName, taskKey } from '../domain.js';
-import { openTaskPanel, taskWho, renewModal, setDateModal, restoreTask } from '../actions.js';
-import { setBadge } from '../shell.js';
+import * as api from './api.js';
+import { can } from './state.js';
+import { html, mount, on, pill, fmtDate, dueText, loadingHtml, emptyHtml, plural } from './ui.js';
+import { STATUS_LABEL, STATUS_ORDER, driverName, taskKey } from './domain.js';
+import { openTaskPanel, taskWho, renewModal, setDateModal, restoreTask } from './actions.js';
+import { setBadge } from './shell.js';
 
 const KINDS = [['all', 'All'], ['vehicle', 'Vehicles'], ['driver', 'Drivers'], ['policy', 'Insurance']];
 

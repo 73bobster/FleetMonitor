@@ -20,12 +20,16 @@ export function navigate(hash) {
 }
 
 export function start() {
+  // First load: always begin on a real route, whatever else is in the address (blank, #main, an email-link token).
+  if (!location.hash.startsWith('#/')) history.replaceState(null, '', `${location.pathname}${location.search}#/tasks`);
   window.removeEventListener('hashchange', dispatch);
   window.addEventListener('hashchange', dispatch);
   return dispatch();
 }
 
 export async function dispatch() {
+  // Ignore hashes that are not app routes, such as the skip link (#main) or sign-in tokens from an email link.
+  if (location.hash && !location.hash.startsWith('#/')) return;
   const { path, query } = parseHash();
   const main = document.getElementById('main');
   if (!main) return;

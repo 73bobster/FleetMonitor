@@ -1,16 +1,16 @@
 // Vehicles: list, add or edit, and the detail page with tabs.
-import * as api from '../api.js';
-import { can } from '../state.js';
+import * as api from './api.js';
+import { can } from './state.js';
 import {
   html, mount, on, plate, pill, fieldsHtml, readForm, openModal, toast, loadingHtml, emptyHtml, errorHtml,
   fmtDate, fmtDateShort, fmtInt, fmtMoney, dueText, todayStr, formatReg,
-} from '../ui.js';
+} from './ui.js';
 import {
   CATEGORY_LABEL, FUEL_LABEL, OWNERSHIP_LABEL, VEHICLE_STATUS_LABEL, LICENCE_STATUS_LABEL, BLOCKING_LICENCE,
   STATUS_LABEL, driverName, vehicleTitle, worstStatus, taskKey,
-} from '../domain.js';
-import { openTaskPanel, taskWho } from '../actions.js';
-import { navigate } from '../router.js';
+} from './domain.js';
+import { openTaskPanel, taskWho } from './actions.js';
+import { navigate } from './router.js';
 import { historyList } from './history.js';
 
 const opts = (o) => Object.entries(o);

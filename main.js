@@ -1,15 +1,15 @@
 // Boot: connect to Supabase, work out who is signed in and which organisation they are in, then run the app.
-import { CONFIG } from '../config.js';
+import { CONFIG } from './config.js';
 import * as api from './api.js';
 import { state, can, setMembership, clearState } from './state.js';
 import { route, onRoute, start as startRouter } from './router.js';
 import { renderShell, setActive, setBadge } from './shell.js';
 import { showAuth, showNoAccess, showRecovery } from './auth.js';
 import { html, mount, toast, errorHtml } from './ui.js';
-import { tasksView } from './views/tasks.js';
-import { vehiclesList, vehicleForm, vehicleDetail } from './views/vehicles.js';
-import { driversList, driverForm, driverDetail } from './views/drivers.js';
-import { placeholder } from './views/placeholder.js';
+import { tasksView } from './tasks.js';
+import { vehiclesList, vehicleForm, vehicleDetail } from './vehicles.js';
+import { driversList, driverForm, driverDetail } from './drivers.js';
+import { placeholder } from './placeholder.js';
 
 const INVITE_KEY = 'fm:invite';
 const store = {
