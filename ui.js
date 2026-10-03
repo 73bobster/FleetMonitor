@@ -57,6 +57,7 @@ const ICONS = {
   insurance: '<path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/>',
   reports: '<path d="M5 20V10M12 20V4M19 20v-7"/>',
   audit: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+  incidents: '<path d="M12 3l10 18H2z"/><path d="M12 10v5M12 18v.5"/>',
   settings: '<path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/>',
   more: '<circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/>',
   plus: '<path d="M12 5v14M5 12h14"/>',
@@ -86,6 +87,8 @@ export function wireLogos(root) {
     }, { once: true });
   });
 }
+
+export const facts = (pairs) => html`<dl class="facts">${pairs.filter(([, v]) => v !== null && v !== undefined && v !== '').map(([k, v]) => html`<div><dt>${k}</dt><dd>${v}</dd></div>`)}</dl>`;
 
 export const pill = (status) => html`<span class="pill pill-${status}">${STATUS_LABEL[status] || status}</span>`;
 export const loadingHtml = (text = 'Loading') => html`<p class="loading" role="status">${text}</p>`;
@@ -123,13 +126,15 @@ export function field(f, values = {}) {
     const blank = f.required && cur ? [] : [html`<option value="">${f.blank || (f.required ? 'Choose' : 'Not set')}</option>`];
     control = html`<select ${attrs}>${blank}${opts}</select>`;
   } else {
-    const extra = ['min', 'max', 'step', 'placeholder', 'autocomplete', 'inputmode', 'maxlength']
+    const extra = ['min', 'max', 'step', 'placeholder', 'autocomplete', 'inputmode', 'maxlength', 'list']
       .filter((k) => f[k] !== undefined)
       .map((k) => html` ${k}="${f[k]}"`);
     control = html`<input type="${f.type || 'text'}" ${attrs} value="${cur}"${extra}>`;
   }
   return html`<div class="field ${f.span === 2 ? 'span-2' : ''}"><label for="${id}">${f.label}${f.required ? html`<span class="req" aria-hidden="true"> *</span>` : ''}</label>${control}${f.hint ? html`<p class="hint">${f.hint}</p>` : ''}</div>`;
 }
+
+export const datalist = (id, options) => html`<datalist id="${id}">${options.map(([v, l]) => html`<option value="${v}">${l}</option>`)}</datalist>`;
 
 export const fieldsHtml = (specs, values = {}) => html`<div class="form-grid">${specs.map((f) => field(f, values))}</div>`;
 

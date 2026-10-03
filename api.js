@@ -14,7 +14,8 @@ export function friendly(err) {
   if (/row-level security|permission denied/i.test(msg)) return "You don't have permission to do that.";
   if (err?.code === '23505') {
     if (/registration/i.test(msg)) return 'A vehicle with that registration already exists.';
-    if (/employee_number/i.test(msg)) return 'A driver with that employee number already exists.';
+    if (/employee_number/i.test(msg)) return 'A current driver with that employee number already exists.';
+    if (/licence_no/i.test(msg)) return 'A driver with that licence number already exists.';
     return 'That already exists.';
   }
   if (err?.code === '23503') return 'That is linked to a record that no longer exists. Refresh and try again.';
@@ -69,6 +70,8 @@ export function logoUrl(brand) {
 // ---- Tasks and compliance ------------------------------------------------
 export const listTasks = async () =>
   ok(await sb.from('compliance_tasks').select('*').eq('organisation_id', org()).order('due_date', { ascending: true, nullsFirst: false }));
+export const listComplianceTypes = async () =>
+  ok(await sb.from('compliance_types').select('*').eq('organisation_id', org()).order('sort_order'));
 
 export async function recordRenewal({ itemId, completedOn, newDueDate, reference, cost, notes }) {
   return ok(await sb.rpc('record_compliance_renewal', {
@@ -81,12 +84,12 @@ export const updateItem = async (id, patch) =>
 export const listRenewals = async (itemId) =>
   ok(await sb.from('compliance_renewals').select('*').eq('organisation_id', org()).eq('compliance_item_id', itemId).order('completed_on', { ascending: false }).limit(5));
 
-export const setTaskState = async ({ source_type, source_id, due_date, state: st, snoozed_until, reason }) =>
+export const setTaskState = async ({ source_type, source_id, type_code, due_date, state: st, snoozed_until, reason }) =>
   ok(await sb.from('task_states').upsert(
-    { organisation_id: org(), source_type, source_id, due_date, state: st, snoozed_until: snoozed_until ?? null, reason },
-    { onConflict: 'organisation_id,source_type,source_id,due_date' }));
+    { organisation_id: org(), source_type, source_id, type_code: type_code || '', due_date, state: st, snoozed_until: snoozed_until ?? null, reason },
+    { onConflict: 'organisation_id,source_type,source_id,type_code,due_date' }));
 export const clearTaskState = async (t) =>
-  ok(await sb.from('task_states').delete().eq('organisation_id', org()).eq('source_type', t.source_type).eq('source_id', t.source_id).eq('due_date', t.due_date));
+  ok(await sb.from('task_states').delete().eq('organisation_id', org()).eq('source_type', t.source_type).eq('source_id', t.source_id).eq('type_code', t.state_key || '').eq('due_date', t.due_date));
 
 // ---- Messages -------------------------------------------------------------
 export const listTemplates = async () => ok(await sb.from('message_templates').select('*').eq('organisation_id', org()).eq('is_active', true));
@@ -98,6 +101,12 @@ export const logMessage = async (row) =>
 // ---- Depots ---------------------------------------------------------------
 export const listDepots = async () =>
   ok(await sb.from('depots').select('*').eq('organisation_id', org()).is('archived_at', null).order('name'));
+export const listAllDepots = async () =>
+  ok(await sb.from('depots').select('*').eq('organisation_id', org()).order('name'));
+export async function saveDepot(values, id) {
+  if (id) return ok(await sb.from('depots').update(values).eq('id', id).eq('organisation_id', org()).select().single());
+  return ok(await sb.from('depots').insert({ ...values, organisation_id: org() }).select().single());
+}
 
 // ---- Vehicles ---------------------------------------------------------------
 export const listVehicles = async () =>
@@ -110,6 +119,10 @@ export async function saveVehicle(values, id) {
 }
 export const archiveVehicle = async (id) =>
   ok(await sb.from('vehicles').update({ archived_at: new Date().toISOString() }).eq('id', id).eq('organisation_id', org()).select().single());
+export const restoreVehicle = async (id) =>
+  ok(await sb.from('vehicles').update({ archived_at: null }).eq('id', id).eq('organisation_id', org()).select().single());
+export const disposeVehicle = async ({ id, date, reason, salePrice, soldTo, notes }) =>
+  ok(await sb.rpc('dispose_vehicle', { p_vehicle_id: id, p_date: date, p_reason: reason, p_sale_price: salePrice ?? null, p_sold_to: soldTo ?? null, p_notes: notes ?? null }));
 
 // ---- Drivers ----------------------------------------------------------------
 export const listDrivers = async () =>
@@ -120,15 +133,32 @@ export const getDriverSensitive = async (id) =>
   ok(await sb.from('driver_sensitive').select('*').eq('organisation_id', org()).eq('driver_id', id).maybeSingle());
 export async function saveDriver(values, sensitive, id, forceSensitive = false) {
   let driver;
-  if (id) driver = ok(await sb.from('drivers').update(values).eq('id', id).eq('organisation_id', org()).select().single());
-  else driver = ok(await sb.from('drivers').insert({ ...values, organisation_id: org() }).select().single());
+  if (id) {
+    driver = ok(await sb.from('drivers').update(values).eq('id', id).eq('organisation_id', org()).select().single());
+    // keep the current period of employment in step with the employee number and job title
+    if ('employee_number' in values || 'job_title' in values) {
+      ok(await sb.from('driver_periods').update({ employee_number: values.employee_number ?? null, job_title: values.job_title ?? null }).eq('organisation_id', org()).eq('driver_id', id).is('end_date', null));
+    }
+  } else driver = ok(await sb.from('drivers').insert({ ...values, organisation_id: org() }).select().single());
   if (sensitive && (forceSensitive || Object.values(sensitive).some((v) => v !== null && v !== undefined && !(Array.isArray(v) && !v.length)))) {
     ok(await sb.from('driver_sensitive').upsert({ ...sensitive, driver_id: driver.id, organisation_id: org() }, { onConflict: 'driver_id' }));
   }
   return driver;
 }
 export const archiveDriver = async (id) =>
-  ok(await sb.from('drivers').update({ archived_at: new Date().toISOString(), employment_status: 'left' }).eq('id', id).eq('organisation_id', org()).select().single());
+  ok(await sb.from('drivers').update({ archived_at: new Date().toISOString() }).eq('id', id).eq('organisation_id', org()).select().single());
+// A returning driver is recognised by their licence number.
+export async function findDriverByLicence(number) {
+  const row = ok(await sb.from('driver_sensitive').select('driver_id').eq('organisation_id', org()).eq('licence_number', number).maybeSingle());
+  return row ? getDriver(row.driver_id) : null;
+}
+export const listPeriods = async (driverId) =>
+  ok(await sb.from('driver_periods').select('*').eq('organisation_id', org()).eq('driver_id', driverId).order('start_date', { ascending: false }));
+export const leaveDriver = async ({ id, date, reason, notes }) =>
+  ok(await sb.rpc('leave_driver', { p_driver_id: id, p_end_date: date, p_reason: reason, p_notes: notes ?? null }));
+export const rehireDriver = async ({ id, startDate, employeeNumber, jobTitle }) =>
+  ok(await sb.rpc('rehire_driver', { p_driver_id: id, p_start_date: startDate, p_employee_number: employeeNumber ?? null, p_job_title: jobTitle ?? null }));
+
 export const currentLicences = async () =>
   ok(await sb.from('driver_current_licence').select('*').eq('organisation_id', org()));
 export const listLicenceChecks = async (driverId) =>
@@ -136,7 +166,66 @@ export const listLicenceChecks = async (driverId) =>
 export const addLicenceCheck = async (values) =>
   ok(await sb.from('licence_checks').insert({ ...values, organisation_id: org() }).select().single());
 
-// ---- Assignments and readings --------------------------------------------------
+// ---- Convictions ------------------------------------------------------------
+export const listConvictions = async (driverId) => {
+  let q = sb.from('driver_convictions').select('*').eq('organisation_id', org());
+  if (driverId) q = q.eq('driver_id', driverId);
+  return ok(await q.order('offence_date', { ascending: false }));
+};
+export const listConvictionCodes = async () => ok(await sb.from('conviction_codes').select('*').order('code'));
+export async function saveConviction(values, id) {
+  if (id) return ok(await sb.from('driver_convictions').update(values).eq('id', id).eq('organisation_id', org()).select().single());
+  return ok(await sb.from('driver_convictions').insert({ ...values, organisation_id: org() }).select().single());
+}
+export const updateConviction = (id, patch) => saveConviction(patch, id);
+
+// ---- Incidents (accidents, damage and fines) --------------------------------------
+export async function listIncidents({ vehicleId, driverId } = {}) {
+  let q = sb.from('incidents').select('*').eq('organisation_id', org()).is('archived_at', null);
+  if (vehicleId) q = q.eq('vehicle_id', vehicleId);
+  if (driverId) q = q.eq('driver_id', driverId);
+  return ok(await q.order('incident_date', { ascending: false }));
+}
+export const getIncident = async (id) =>
+  ok(await sb.from('incidents').select('*').eq('organisation_id', org()).eq('id', id).maybeSingle());
+export async function saveIncident(values, id) {
+  if (id) return ok(await sb.from('incidents').update(values).eq('id', id).eq('organisation_id', org()).select().single());
+  return ok(await sb.from('incidents').insert({ ...values, organisation_id: org() }).select().single());
+}
+export const updateIncident = (id, patch) => saveIncident(patch, id);
+export const archiveIncident = (id) => saveIncident({ archived_at: new Date().toISOString() }, id);
+
+// ---- Insurance --------------------------------------------------------------------
+export const listPolicies = async () =>
+  ok(await sb.from('insurance_policies').select('*').eq('organisation_id', org()).is('archived_at', null).order('end_date', { ascending: false }));
+export const getPolicy = async (id) =>
+  ok(await sb.from('insurance_policies').select('*').eq('organisation_id', org()).eq('id', id).maybeSingle());
+export async function savePolicy(values, id) {
+  if (id) return ok(await sb.from('insurance_policies').update(values).eq('id', id).eq('organisation_id', org()).select().single());
+  return ok(await sb.from('insurance_policies').insert({ ...values, organisation_id: org() }).select().single());
+}
+export async function listPolicyVehicles({ policyId, vehicleId } = {}) {
+  let q = sb.from('policy_vehicles').select('*').eq('organisation_id', org());
+  if (policyId) q = q.eq('policy_id', policyId);
+  if (vehicleId) q = q.eq('vehicle_id', vehicleId);
+  return ok(await q.order('start_date', { ascending: false, nullsFirst: false }));
+}
+export const addPolicyVehicle = async (values) =>
+  ok(await sb.from('policy_vehicles').insert({ ...values, organisation_id: org() }).select().single());
+export const endPolicyVehicle = async (id, endDate) =>
+  ok(await sb.from('policy_vehicles').update({ end_date: endDate }).eq('id', id).eq('organisation_id', org()).select().single());
+export const listClaims = async (policyId) =>
+  ok(await sb.from('insurance_claims').select('*').eq('organisation_id', org()).eq('policy_id', policyId).is('archived_at', null).order('incident_date', { ascending: false }));
+export async function saveClaim(values, id) {
+  if (id) return ok(await sb.from('insurance_claims').update(values).eq('id', id).eq('organisation_id', org()).select().single());
+  return ok(await sb.from('insurance_claims').insert({ ...values, organisation_id: org() }).select().single());
+}
+export const listContacts = async () =>
+  ok(await sb.from('contacts').select('*').eq('organisation_id', org()).is('archived_at', null).order('name'));
+export const saveContact = async (values) =>
+  ok(await sb.from('contacts').insert({ ...values, organisation_id: org() }).select().single());
+
+// ---- Assignments, readings and costs -------------------------------------------------
 export async function listAssignments({ vehicleId, driverId }) {
   let q = sb.from('vehicle_assignments').select('*').eq('organisation_id', org());
   if (vehicleId) q = q.eq('vehicle_id', vehicleId);
@@ -155,7 +244,58 @@ export const listReadings = async (vehicleId) =>
   ok(await sb.from('odometer_readings').select('*').eq('organisation_id', org()).eq('vehicle_id', vehicleId).order('reading_date', { ascending: false }).order('mileage', { ascending: false }).limit(50));
 export const addReading = async (values) =>
   ok(await sb.from('odometer_readings').insert({ ...values, organisation_id: org() }).select().single());
+export const listCosts = async (vehicleId) =>
+  ok(await sb.from('vehicle_costs').select('*').eq('organisation_id', org()).eq('vehicle_id', vehicleId).order('cost_date', { ascending: false }).limit(100));
+export const addCost = async (values) =>
+  ok(await sb.from('vehicle_costs').insert({ ...values, organisation_id: org() }).select().single());
 
-// ---- Audit ------------------------------------------------------------------------
-export const listAudit = async (table, recordId) =>
-  ok(await sb.from('audit_log').select('*').eq('organisation_id', org()).eq('table_name', table).eq('record_id', recordId).order('occurred_at', { ascending: false }).limit(50));
+// ---- Documents ------------------------------------------------------------------------
+const FOLDER = { vehicle_id: 'vehicles', driver_id: 'drivers', policy_id: 'policies', incident_id: 'incidents' };
+const safeName = (n) => String(n || 'file').normalize('NFKD').replace(/[^\w.\- ]+/g, '_').replace(/\s+/g, ' ').trim().slice(0, 120) || 'file';
+
+export async function listDocuments(target) {
+  let q = sb.from('documents').select('*').eq('organisation_id', org()).is('archived_at', null);
+  for (const [k, v] of Object.entries(target)) q = q.eq(k, v);
+  return ok(await q.order('created_at', { ascending: false }));
+}
+// Stores the file in the private bucket (path starts with the organisation id), then records it.
+export async function uploadDocument({ file, name, category, target }) {
+  const key = Object.keys(target)[0];
+  const path = `${org()}/${FOLDER[key]}/${target[key]}/${crypto.randomUUID()}-${safeName(name || file.name)}`;
+  const up = await sb.storage.from('fleet-documents').upload(path, file, { contentType: file.type || 'application/octet-stream', upsert: false });
+  if (up.error) fail(up.error);
+  try {
+    return ok(await sb.from('documents').insert({
+      organisation_id: org(), ...target, category, file_name: name || file.name, storage_path: path, mime_type: file.type || null, size_bytes: file.size,
+    }).select().single());
+  } catch (e) {
+    await sb.storage.from('fleet-documents').remove([path]).catch(() => {});
+    throw e;
+  }
+}
+export async function documentUrl(path) {
+  const { data, error } = await sb.storage.from('fleet-documents').createSignedUrl(path, 300);
+  if (error) fail(error);
+  return data.signedUrl;
+}
+export const archiveDocument = async (id) =>
+  ok(await sb.from('documents').update({ archived_at: new Date().toISOString() }).eq('id', id).eq('organisation_id', org()).select().single());
+
+// ---- Audit ------------------------------------------------------------------------------
+// History for one vehicle or driver: every significant change across all their records, newest first.
+// Mileage readings are left out on purpose.
+export async function listAuditFor({ vehicleId, driverId, limit = 100 }) {
+  let q = sb.from('audit_log').select('*').eq('organisation_id', org()).neq('table_name', 'odometer_readings');
+  if (vehicleId) q = q.eq('vehicle_id', vehicleId);
+  if (driverId) q = q.eq('driver_id', driverId);
+  return ok(await q.order('occurred_at', { ascending: false }).limit(limit));
+}
+export async function searchAudit({ from, to, vehicleId, driverId, includeReadings = false, limit = 200 }) {
+  let q = sb.from('audit_log').select('*').eq('organisation_id', org());
+  if (from) q = q.gte('occurred_at', new Date(`${from}T00:00:00`).toISOString());
+  if (to) { const end = new Date(`${to}T00:00:00`); end.setDate(end.getDate() + 1); q = q.lt('occurred_at', end.toISOString()); }
+  if (vehicleId) q = q.eq('vehicle_id', vehicleId);
+  if (driverId) q = q.eq('driver_id', driverId);
+  if (!includeReadings) q = q.neq('table_name', 'odometer_readings');
+  return ok(await q.order('occurred_at', { ascending: false }).limit(limit));
+}

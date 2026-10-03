@@ -9,6 +9,10 @@ import { html, mount, toast, errorHtml } from './ui.js';
 import { tasksView } from './tasks.js';
 import { vehiclesList, vehicleForm, vehicleDetail } from './vehicles.js';
 import { driversList, driverForm, driverDetail } from './drivers.js';
+import { incidentsList, incidentForm, incidentDetail } from './incidents.js';
+import { insuranceList, policyForm, policyDetail } from './insurance.js';
+import { settingsView } from './settings.js';
+import { auditView } from './audit.js';
 import { placeholder } from './placeholder.js';
 
 const INVITE_KEY = 'fm:invite';
@@ -39,10 +43,17 @@ route('/drivers', 'drivers', (m) => driversList(m));
 route('/drivers/new', 'drivers', (m) => driverForm(m, { id: 'new' }));
 route('/drivers/:id/edit', 'drivers', (m, p) => driverForm(m, p));
 route('/drivers/:id', 'drivers', (m, p, q) => driverDetail(m, p, q));
-route('/insurance', 'insurance', (m) => placeholder(m, 'Insurance', 'Policies, claims and renewals arrive in the next update. Once policies are added, their renewal dates will appear under Tasks.'));
+route('/incidents', 'incidents', (m) => incidentsList(m));
+route('/incidents/new', 'incidents', (m, p, q) => incidentForm(m, { id: 'new' }, q));
+route('/incidents/:id/edit', 'incidents', (m, p, q) => incidentForm(m, p, q));
+route('/incidents/:id', 'incidents', (m, p) => incidentDetail(m, p));
+route('/insurance', 'insurance', (m) => insuranceList(m));
+route('/insurance/new', 'insurance', (m) => policyForm(m, { id: 'new' }));
+route('/insurance/:id/edit', 'insurance', (m, p) => policyForm(m, p));
+route('/insurance/:id', 'insurance', (m, p, q) => policyDetail(m, p, q));
 route('/reports', 'reports', (m) => placeholder(m, 'Reports', 'Compliance and cost reports, with CSV export, arrive in a later update.'));
-route('/audit', 'audit', (m) => placeholder(m, 'Audit log', can.audit ? 'Search across every change, and the messages sent, arrives in a later update. For now, each vehicle and driver has its own History tab.' : "You don't have access to the audit log."));
-route('/settings', 'settings', (m) => placeholder(m, 'Settings', can.configure ? 'Depots, users and roles, compliance types, message templates and branding are managed here in a later update. Until then they are set up directly in the database.' : "You don't have access to settings."));
+route('/audit', 'audit', (m) => auditView(m));
+route('/settings', 'settings', (m) => settingsView(m));
 onRoute(setActive);
 
 // ---- Session flow -----------------------------------------------------------------

@@ -251,3 +251,41 @@ main:focus { outline: none; }
   .facts > div { grid-template-columns: 1fr; gap: 2px; }
 }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+
+/* ---- Additions: banners, documents, audit, totals ---- */
+[hidden] { display: none !important; }
+.banner-info, .banner-warn, .banner-danger { margin: 0 0 18px; padding: 12px 16px; font-size: .875rem; border-radius: var(--radius); border-left: 5px solid; }
+.banner-info { color: var(--info); background: var(--info-bg); border-color: var(--info); }
+.banner-warn { color: var(--soon); background: var(--soon-bg); border-color: #D98A00; }
+.banner-danger { color: var(--overdue); background: var(--overdue-bg); border-color: var(--overdue); }
+.banner-warn .plate, .banner-info .plate { font-size: 1rem; }
+.spaced { margin: 28px 0 12px; }
+.mono { font-family: var(--font-ui); letter-spacing: .04em; }
+.section-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
+.later { margin-top: 36px; }
+.chips { margin-top: 2px; }
+.subject { display: inline-flex; gap: 6px; align-items: center; margin: 0 4px; }
+.subject .plate { font-size: .95rem; }
+.presets { margin: -4px 0 18px; font-size: .8125rem; }
+.presets .link { margin: 0 6px; }
+.audit-filters, .inline-field { align-items: end; }
+.inline-field { display: grid; gap: 2px; }
+.inline-field label { font-size: .75rem; font-weight: 700; }
+.inline-field input { min-height: 40px; }
+.grid tfoot td { padding: 10px 16px; font-weight: 700; background: #FAFAFA; border-top: 1px solid var(--line); border-bottom: 0; }
+.totals-label { color: var(--ink-2); }
+.dropzone { margin-bottom: 20px; padding: 18px 20px; background: var(--surface); border: 2px dashed var(--line-strong); border-radius: var(--radius-lg); }
+.dropzone.over { background: #FFF3F8; border-color: var(--brand); }
+.dropzone .field { max-width: 300px; margin-bottom: 10px; }
+.doc-buttons { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0; }
+.upload-status { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 4px; font-size: .8125rem; }
+.upload-status .busy { color: var(--ink-2); }
+.upload-status .done { color: var(--ok); }
+.upload-status .failed { color: var(--overdue); }
+.camera { display: block; width: 100%; max-height: 60vh; background: #111; border-radius: var(--radius); }
+fieldset.pick { margin: 14px 0 0; display: grid; gap: 10px; max-height: 280px; overflow: auto; }
+.btn[href] { text-decoration: none; }
+@media (max-width: 860px) {
+  .grid tfoot, .grid tfoot tr { display: block; }
+  .grid tfoot td { display: flex; justify-content: space-between; padding: 9px 14px; }
+}

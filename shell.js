@@ -7,6 +7,7 @@ const NAV = [
   { id: 'tasks', label: 'Tasks', href: '#/tasks' },
   { id: 'vehicles', label: 'Vehicles', href: '#/vehicles' },
   { id: 'drivers', label: 'Drivers', href: '#/drivers' },
+  { id: 'incidents', label: 'Incidents', href: '#/incidents' },
   { id: 'insurance', label: 'Insurance', href: '#/insurance' },
   { id: 'reports', label: 'Reports', href: '#/reports' },
   { id: 'audit', label: 'Audit log', href: '#/audit', when: () => can.audit },

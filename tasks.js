@@ -3,10 +3,10 @@ import * as api from './api.js';
 import { can } from './state.js';
 import { html, mount, on, pill, fmtDate, dueText, loadingHtml, emptyHtml, plural } from './ui.js';
 import { STATUS_LABEL, STATUS_ORDER, driverName, taskKey } from './domain.js';
-import { openTaskPanel, taskWho, renewModal, setDateModal, restoreTask } from './actions.js';
+import { openTaskPanel, taskWho, quickButton, runAction } from './actions.js';
 import { setBadge } from './shell.js';
 
-const KINDS = [['all', 'All'], ['vehicle', 'Vehicles'], ['driver', 'Drivers'], ['policy', 'Insurance']];
+const KINDS = [['all', 'All'], ['vehicle', 'Vehicles'], ['driver', 'Drivers'], ['incident', 'Incidents'], ['policy', 'Insurance']];
 
 export async function tasksView(main) {
   mount(main, html`<header class="page-head"><h1>Tasks</h1></header>${loadingHtml('Loading tasks')}`);
@@ -42,12 +42,12 @@ export async function tasksView(main) {
 
   const row = (t) => {
     const k = taskKey(t);
+    const qb = quickButton(t);
     let quick = '';
-    if (can.write) {
-      if (t.status === 'snoozed' || t.status === 'dismissed') quick = html`<button class="btn btn-sm" data-action="restore" data-key="${k}">Restore</button>`;
-      else if (t.source_type === 'compliance_item') quick = t.status === 'no_date'
-        ? html`<button class="btn btn-sm btn-primary" data-action="setdate" data-key="${k}">Set date</button>`
-        : html`<button class="btn btn-sm btn-primary" data-action="renew" data-key="${k}">Record renewal</button>`;
+    if (qb && (qb.href || can.write)) {
+      quick = qb.href
+        ? html`<a class="btn btn-sm ${qb.primary ? 'btn-primary' : ''}" href="${qb.href}" data-action="nav">${qb.label}</a>`
+        : html`<button class="btn btn-sm btn-primary" data-action="act" data-act="${qb.action}" data-key="${k}">${qb.label}</button>`;
     }
     return html`<li class="task task-${t.status}" data-action="open" data-key="${k}">
       <div class="task-main">
@@ -105,9 +105,8 @@ export async function tasksView(main) {
     },
     toggle: (el) => { const g = el.dataset.group; if (ui.open.has(g)) ui.open.delete(g); else ui.open.add(g); drawList(); },
     open: (el) => withTask(el, (t) => openTaskPanel(t, ctx, refresh)),
-    renew: (el) => withTask(el, (t) => renewModal(t, ctx, refresh)),
-    setdate: (el) => withTask(el, (t) => setDateModal(t, ctx, refresh)),
-    restore: (el) => withTask(el, async (t) => { await restoreTask(t); await refresh(); }),
+    act: (el) => withTask(el, (t) => runAction(el.dataset.act, t, ctx, refresh)),
+    nav: (el) => { location.hash = el.getAttribute('href'); },
   });
   main.querySelector('#task-search').addEventListener('input', (e) => { ui.q = e.target.value.trim().toLowerCase(); drawList(); });
   main.querySelector('#depot-filter')?.addEventListener('change', (e) => { ui.depot = e.target.value; drawList(); });

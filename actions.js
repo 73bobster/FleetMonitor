@@ -1,5 +1,5 @@
-// Everything you can do to a task: record a renewal, set a date, snooze, dismiss, email.
-// Shared by the Tasks screen and the vehicle and driver compliance tabs.
+// Everything you can do to a task: record a renewal, set a date, snooze, dismiss, email,
+// tell the insurer, record a fine as paid, and so on. Shared by Tasks and the vehicle and driver pages.
 import * as api from './api.js';
 import { state, can } from './state.js';
 import {
@@ -8,21 +8,69 @@ import {
 } from './ui.js';
 
 export const merge = (text, vars) => String(text).replace(/\{\{\s*(\w+)\s*\}\}/g, (_, k) => vars[k] ?? '');
+const isQuiet = (t) => t.status === 'snoozed' || t.status === 'dismissed';
 
 export function taskWho(t, ctx = {}) {
-  if (t.vehicle_id) {
+  if (t.vehicle_id && t.applies_to === 'vehicle') {
     const v = ctx.vehicles?.get(t.vehicle_id);
     return html`${plate(v?.registration || String(t.target_label).split(' - ')[0])}${v?.nickname ? html` <span class="muted">${v.nickname}</span>` : ''}`;
   }
   return html`<span>${t.target_label}</span>`;
 }
 
-const isQuiet = (t) => t.status === 'snoozed' || t.status === 'dismissed';
+// What can be done with this task. Buttons with an href open another screen.
+export function taskButtons(t) {
+  if (isQuiet(t)) return [{ action: 'restore', label: 'Restore', primary: true }];
+  const out = [];
+  switch (t.type_code) {
+    case 'INSURANCE_RENEWAL': out.push({ href: `#/insurance/${t.source_id}`, label: 'Open policy', primary: true }); break;
+    case 'CONVICTION_INSURER_NOTICE':
+      out.push({ action: 'notify-conviction', label: 'Record insurer told', primary: true }, { href: `#/drivers/${t.driver_id}?tab=convictions`, label: 'Open driver' }); break;
+    case 'CONVICTION_LICENCE_END': case 'CONVICTION_TOTTING_END': case 'CONVICTION_DISCLOSURE_END':
+      out.push({ href: `#/drivers/${t.driver_id}?tab=convictions`, label: 'Open driver' }); break;
+    case 'INCIDENT_INSURER_NOTICE':
+      out.push({ action: 'notify-incident', label: 'Record insurer told', primary: true }, { href: `#/incidents/${t.source_id}`, label: 'Open incident' }); break;
+    case 'FINE_PAYMENT':
+      out.push({ action: 'paid', label: 'Record paid', primary: true }, { href: `#/incidents/${t.source_id}`, label: 'Open fine' }); break;
+    case 'FINE_NOMINATION':
+      out.push({ action: 'nominated', label: 'Record driver named', primary: true }, { href: `#/incidents/${t.source_id}`, label: 'Open fine' }); break;
+    case 'LEASE_END':
+      out.push({ action: 'extend', label: 'Extend the term', primary: true }, { href: `#/vehicles/${t.source_id}?dispose=1`, label: 'Dispose of the vehicle' }, { href: `#/vehicles/${t.source_id}`, label: 'Open vehicle' }); break;
+    case 'VEHICLE_UNINSURED': out.push({ href: `#/vehicles/${t.source_id}?tab=insurance`, label: 'Add to a policy', primary: true }); break;
+    case 'VEHICLE_DISPOSAL_INSURER':
+      out.push({ action: 'notify-vehicle', label: 'Record insurer told', primary: true }, { href: `#/vehicles/${t.source_id}`, label: 'Open vehicle' }); break;
+    default:
+      out.push(t.due_date ? { action: 'renew', label: 'Record renewal', primary: true } : { action: 'setdate', label: 'Set due date', primary: true });
+      if (t.due_date) out.push({ action: 'setdate', label: 'Correct due date' });
+      out.push({ action: 'email', label: 'Email driver' });
+  }
+  if (t.due_date) out.push({ action: 'snooze', label: 'Snooze' }, { action: 'dismiss', label: 'Dismiss' });
+  return out;
+}
+export const quickButton = (t) => taskButtons(t).find((b) => b.primary) || null;
+
+export function runAction(action, t, ctx, onChange) {
+  const map = {
+    renew: () => renewModal(t, ctx, onChange),
+    setdate: () => setDateModal(t, ctx, onChange),
+    email: () => emailModal(t, ctx, onChange),
+    snooze: () => snoozeModal(t, ctx, onChange),
+    dismiss: () => dismissModal(t, ctx, onChange),
+    restore: async () => { await restoreTask(t); toast('Task restored.'); closeModal(); await onChange?.(); },
+    'notify-conviction': () => told(t, ctx, onChange, 'Record that the insurer was told', (v) => api.updateConviction(t.source_id, { insurer_notified_on: v.date, insurer_notified_ref: v.ref }), 'Insurer notice recorded.'),
+    'notify-incident': () => told(t, ctx, onChange, 'Record that the insurer was told', (v) => api.updateIncident(t.source_id, { insurer_notified_on: v.date, insurer_notified_ref: v.ref }), 'Insurer notice recorded.'),
+    'notify-vehicle': () => told(t, ctx, onChange, 'Record that the insurer was told', (v) => api.saveVehicle({ disposal_insurer_notified_on: v.date }, t.source_id), 'Insurer notice recorded.', false),
+    paid: () => paidModal(t, ctx, onChange),
+    nominated: () => nominatedModal(t, ctx, onChange),
+    extend: () => extendModal(t, ctx, onChange),
+  };
+  return map[action]?.();
+}
 
 // ---- Task panel -----------------------------------------------------------
 export function openTaskPanel(t, ctx, onChange) {
   const quiet = isQuiet(t);
-  const policy = t.source_type === 'policy';
+  const buttons = can.write ? taskButtons(t) : taskButtons(t).filter((b) => b.href);
   const dlg = openModal({
     title: t.type_name,
     hideFooter: true,
@@ -34,25 +82,14 @@ export function openTaskPanel(t, ctx, onChange) {
         ${quiet ? html`<div><dt>${t.status === 'snoozed' ? `Snoozed until ${fmtDateShort(t.snoozed_until)}` : 'Dismissed'}</dt><dd>${t.state_reason}</dd></div>` : ''}
         ${t.is_statutory ? html`<div><dt>Requirement</dt><dd>Statutory</dd></div>` : ''}
       </dl>
-      ${can.write ? html`<div class="panel-actions">
-        ${!quiet && !policy ? (t.due_date
-          ? html`<button class="btn btn-primary" data-action="renew">Record renewal</button>`
-          : html`<button class="btn btn-primary" data-action="setdate">Set due date</button>`) : ''}
-        ${!quiet && !policy && t.due_date ? html`<button class="btn" data-action="setdate">Correct due date</button>` : ''}
-        ${!quiet && !policy ? html`<button class="btn" data-action="email">Email driver</button>` : ''}
-        ${!quiet && t.due_date ? html`<button class="btn" data-action="snooze">Snooze</button><button class="btn" data-action="dismiss">Dismiss</button>` : ''}
-        ${quiet ? html`<button class="btn btn-primary" data-action="restore">Restore</button>` : ''}
-      </div>
-      ${policy ? html`<p class="hint">Renew this policy by updating its end date under Insurance.</p>` : ''}` : ''}
+      ${buttons.length ? html`<div class="panel-actions">${buttons.map((b) => b.href
+        ? html`<a class="btn ${b.primary ? 'btn-primary' : ''}" href="${b.href}" data-action="go">${b.label}</a>`
+        : html`<button class="btn ${b.primary ? 'btn-primary' : ''}" data-action="act" data-act="${b.action}">${b.label}</button>`)}</div>` : ''}
       <section class="panel-history" id="panel-history"><h3>History</h3><p class="muted">Loading</p></section>`,
   });
   on(dlg, {
-    renew: () => renewModal(t, ctx, onChange),
-    setdate: () => setDateModal(t, ctx, onChange),
-    email: () => emailModal(t, ctx, onChange),
-    snooze: () => snoozeModal(t, ctx, onChange),
-    dismiss: () => dismissModal(t, ctx, onChange),
-    restore: async () => { await restoreTask(t); toast('Task restored.'); closeModal(); await onChange?.(); },
+    go: (el) => { closeModal(); location.hash = el.getAttribute('href'); },
+    act: (el) => runAction(el.dataset.act, t, ctx, onChange),
   });
   loadHistory(t);
 }
@@ -78,7 +115,20 @@ async function loadHistory(t) {
   }
 }
 
-// ---- Forms ---------------------------------------------------------------------
+// ---- Small forms -----------------------------------------------------------------
+function form(t, ctx, { title, submitLabel = 'Save', specs, values = {}, intro = '', hint = '', onSave, done }, onChange) {
+  openModal({
+    title, submitLabel,
+    body: html`<div class="panel-who">${taskWho(t, ctx)}</div>${intro ? html`<p class="muted">${intro}</p>` : ''}${fieldsHtml(specs, values)}${hint ? html`<p class="hint">${hint}</p>` : ''}`,
+    onSubmit: async (f) => {
+      const v = readForm(f, specs);
+      const result = await onSave(v);
+      toast(typeof done === 'function' ? done(v, result) : done);
+      await onChange?.();
+    },
+  });
+}
+
 export function renewModal(t, ctx, onChange) {
   const specs = [
     { name: 'completed_on', label: 'Completed on', type: 'date', required: true, max: todayStr() },
@@ -87,17 +137,11 @@ export function renewModal(t, ctx, onChange) {
     { name: 'cost', label: 'Cost (£)', type: 'number', step: '0.01', min: '0', inputmode: 'decimal' },
     { name: 'notes', label: 'Notes', type: 'textarea', span: 2 },
   ];
-  openModal({
-    title: `Record renewal: ${t.type_name}`,
-    submitLabel: 'Record renewal',
-    body: html`<div class="panel-who">${taskWho(t, ctx)}</div>${fieldsHtml(specs, { completed_on: todayStr() })}`,
-    onSubmit: async (form) => {
-      const v = readForm(form, specs);
-      const row = await api.recordRenewal({ itemId: t.source_id, completedOn: v.completed_on, newDueDate: v.new_due_date, reference: v.reference, cost: v.cost, notes: v.notes });
-      toast(`Renewal recorded. Next due ${row?.due_date ? fmtDateShort(row.due_date) : 'date not set'}.`);
-      await onChange?.();
-    },
-  });
+  form(t, ctx, {
+    title: `Record renewal: ${t.type_name}`, submitLabel: 'Record renewal', specs, values: { completed_on: todayStr() },
+    onSave: (v) => api.recordRenewal({ itemId: t.source_id, completedOn: v.completed_on, newDueDate: v.new_due_date, reference: v.reference, cost: v.cost, notes: v.notes }),
+    done: (v, row) => `Renewal recorded. Next due ${row?.due_date ? fmtDateShort(row.due_date) : 'date not set'}.`,
+  }, onChange);
 }
 
 export function setDateModal(t, ctx, onChange) {
@@ -105,16 +149,12 @@ export function setDateModal(t, ctx, onChange) {
     { name: 'due_date', label: 'Due date', type: 'date', required: true },
     { name: 'reference', label: 'Certificate or reference number', type: 'text', span: 2 },
   ];
-  openModal({
-    title: `${t.due_date ? 'Correct' : 'Set'} due date: ${t.type_name}`,
-    body: html`<div class="panel-who">${taskWho(t, ctx)}</div>${fieldsHtml(specs, { due_date: t.due_date })}<p class="hint">Use Record renewal when the item has actually been done. This only changes the date.</p>`,
-    onSubmit: async (form) => {
-      const v = readForm(form, specs);
-      await api.updateItem(t.source_id, { due_date: v.due_date, ...(v.reference ? { reference: v.reference } : {}) });
-      toast('Due date saved.');
-      await onChange?.();
-    },
-  });
+  form(t, ctx, {
+    title: `${t.due_date ? 'Correct' : 'Set'} due date: ${t.type_name}`, specs, values: { due_date: t.due_date },
+    hint: 'Use Record renewal when the item has actually been done. This only changes the date.',
+    onSave: (v) => api.updateItem(t.source_id, { due_date: v.due_date, ...(v.reference ? { reference: v.reference } : {}) }),
+    done: 'Due date saved.',
+  }, onChange);
 }
 
 export function snoozeModal(t, ctx, onChange) {
@@ -122,35 +162,60 @@ export function snoozeModal(t, ctx, onChange) {
     { name: 'snoozed_until', label: 'Snooze until', type: 'date', required: true, min: addDaysISO(todayStr(), 1) },
     { name: 'reason', label: 'Reason', type: 'textarea', required: true, span: 2, hint: 'For example: booked in for Thursday. The reason is kept in the audit log.' },
   ];
-  openModal({
-    title: `Snooze: ${t.type_name}`,
-    submitLabel: 'Snooze',
-    body: html`<div class="panel-who">${taskWho(t, ctx)}</div>${fieldsHtml(specs, { snoozed_until: addDaysISO(todayStr(), 7) })}`,
-    onSubmit: async (form) => {
-      const v = readForm(form, specs);
-      await api.setTaskState({ source_type: t.source_type, source_id: t.source_id, due_date: t.due_date, state: 'snoozed', snoozed_until: v.snoozed_until, reason: v.reason });
-      toast(`Snoozed until ${fmtDateShort(v.snoozed_until)}.`);
-      await onChange?.();
-    },
-  });
+  form(t, ctx, {
+    title: `Snooze: ${t.type_name}`, submitLabel: 'Snooze', specs, values: { snoozed_until: addDaysISO(todayStr(), 7) },
+    onSave: (v) => api.setTaskState({ source_type: t.source_type, source_id: t.source_id, type_code: t.state_key, due_date: t.due_date, state: 'snoozed', snoozed_until: v.snoozed_until, reason: v.reason }),
+    done: (v) => `Snoozed until ${fmtDateShort(v.snoozed_until)}.`,
+  }, onChange);
 }
 
 export function dismissModal(t, ctx, onChange) {
   const specs = [{ name: 'reason', label: 'Reason', type: 'textarea', required: true, span: 2, hint: 'Dismissing hides this task for this due date only. The reason is kept in the audit log.' }];
-  openModal({
-    title: `Dismiss: ${t.type_name}`,
-    submitLabel: 'Dismiss',
-    body: html`<div class="panel-who">${taskWho(t, ctx)}</div>${fieldsHtml(specs)}`,
-    onSubmit: async (form) => {
-      const v = readForm(form, specs);
-      await api.setTaskState({ source_type: t.source_type, source_id: t.source_id, due_date: t.due_date, state: 'dismissed', snoozed_until: null, reason: v.reason });
-      toast('Task dismissed.');
-      await onChange?.();
-    },
-  });
+  form(t, ctx, {
+    title: `Dismiss: ${t.type_name}`, submitLabel: 'Dismiss', specs,
+    onSave: (v) => api.setTaskState({ source_type: t.source_type, source_id: t.source_id, type_code: t.state_key, due_date: t.due_date, state: 'dismissed', snoozed_until: null, reason: v.reason }),
+    done: 'Task dismissed.',
+  }, onChange);
 }
 
 export const restoreTask = (t) => api.clearTaskState(t);
+
+function told(t, ctx, onChange, title, save, doneMsg, withRef = true) {
+  const specs = [{ name: 'date', label: 'Date the insurer was told', type: 'date', required: true, max: todayStr() }, ...(withRef ? [{ name: 'ref', label: 'Reference given by the insurer', type: 'text', span: 2 }] : [])];
+  form(t, ctx, { title, submitLabel: 'Save', specs, values: { date: todayStr() }, onSave: save, done: doneMsg }, onChange);
+}
+
+function paidModal(t, ctx, onChange) {
+  const specs = [
+    { name: 'paid_on', label: 'Paid on', type: 'date', required: true, max: todayStr() },
+    { name: 'paid_by', label: 'Paid by', type: 'select', required: true, options: [['company', 'The company'], ['driver', 'The driver']] },
+    { name: 'recharge_to_driver', label: 'Recharge this to the driver', type: 'checkbox', span: 2 },
+  ];
+  form(t, ctx, {
+    title: 'Record fine as paid', specs, values: { paid_on: todayStr(), paid_by: 'company' },
+    onSave: (v) => api.updateIncident(t.source_id, { paid_on: v.paid_on, paid_by: v.paid_by, recharge_to_driver: !!v.recharge_to_driver }),
+    done: 'Fine recorded as paid.',
+  }, onChange);
+}
+
+function nominatedModal(t, ctx, onChange) {
+  const specs = [{ name: 'nominated_on', label: 'Date the driver was named', type: 'date', required: true, max: todayStr() }];
+  form(t, ctx, {
+    title: 'Record that the driver was named', specs, values: { nominated_on: todayStr() },
+    onSave: (v) => api.updateIncident(t.source_id, { nominated_on: v.nominated_on }),
+    done: 'Recorded.',
+  }, onChange);
+}
+
+function extendModal(t, ctx, onChange) {
+  const specs = [{ name: 'term_end', label: 'New end date', type: 'date', required: true, min: t.due_date || undefined }];
+  form(t, ctx, {
+    title: 'Extend the term', specs, values: { term_end: t.due_date ? addDaysISO(t.due_date, 90) : '' },
+    intro: 'Moves the lease, rental or finance end date. The task reappears ahead of the new date.',
+    onSave: (v) => api.saveVehicle({ term_end: v.term_end }, t.source_id),
+    done: (v) => `Term now ends ${fmtDateShort(v.term_end)}.`,
+  }, onChange);
+}
 
 // ---- Email -----------------------------------------------------------------------
 const DEFAULT_BODY = 'Hi {{driver_name}},\n\n{{item_name}} for {{registration}} is due on {{due_date}}. Please speak to the office to arrange it.\n\nThanks,\n{{org_name}}';
@@ -184,8 +249,8 @@ export async function emailModal(t, ctx, onChange) {
     title: `Email about ${t.type_name}`,
     submitLabel: 'Mark as sent',
     body: html`<p class="muted">This opens your email app with the message ready to send. Once you've sent it, choose Mark as sent to record it on the task.</p>${fieldsHtml(specs, values)}<p><a class="btn" id="mailto-link" href="mailto:">Open in email app</a></p>`,
-    onSubmit: async (form) => {
-      const v = readForm(form, specs);
+    onSubmit: async (f) => {
+      const v = readForm(f, specs);
       await api.logMessage({
         source_type: t.source_type, source_id: t.source_id, due_date: t.due_date, channel: 'email',
         recipient_kind: driver ? 'driver' : 'other', driver_id: driver?.id ?? null, recipient_address: v.to,
@@ -196,11 +261,11 @@ export async function emailModal(t, ctx, onChange) {
       await onChange?.();
     },
   });
-  const form = dlg.querySelector('form');
+  const f = dlg.querySelector('form');
   const link = dlg.querySelector('#mailto-link');
   const refresh = () => {
-    link.href = `mailto:${encodeURIComponent(form.elements.to.value)}?subject=${encodeURIComponent(form.elements.subject.value)}&body=${encodeURIComponent(form.elements.body.value)}`;
+    link.href = `mailto:${encodeURIComponent(f.elements.to.value)}?subject=${encodeURIComponent(f.elements.subject.value)}&body=${encodeURIComponent(f.elements.body.value)}`;
   };
-  form.addEventListener('input', refresh);
+  f.addEventListener('input', refresh);
   refresh();
 }
