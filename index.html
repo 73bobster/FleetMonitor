@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>FleetMonitor</title>
+  <meta name="theme-color" content="#0E5A6B">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="img/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="css/theme.css">
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+  <div id="app"><p class="boot">Loading FleetMonitor</p></div>
+  <dialog id="dialog" class="modal" aria-labelledby="dlg-title"></dialog>
+  <div id="toasts" role="status" aria-live="polite"></div>
+  <noscript><p class="boot">FleetMonitor needs JavaScript to run.</p></noscript>
+  <script src="vendor/supabase.js"></script>
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,41 @@
+/* Design tokens. Alchemy's brand colours override --brand and friends at runtime (see js/shell.js applyBrand). */
+@font-face { font-family: "Atkinson Hyperlegible Next"; font-weight: 400; font-style: normal; font-display: swap; src: url("../fonts/atkinson-hyperlegible-next-latin-400-normal.woff2") format("woff2"); }
+@font-face { font-family: "Atkinson Hyperlegible Next"; font-weight: 500; font-style: normal; font-display: swap; src: url("../fonts/atkinson-hyperlegible-next-latin-500-normal.woff2") format("woff2"); }
+@font-face { font-family: "Atkinson Hyperlegible Next"; font-weight: 700; font-style: normal; font-display: swap; src: url("../fonts/atkinson-hyperlegible-next-latin-700-normal.woff2") format("woff2"); }
+@font-face { font-family: "Barlow Condensed"; font-weight: 500; font-style: normal; font-display: swap; src: url("../fonts/barlow-condensed-latin-500-normal.woff2") format("woff2"); }
+@font-face { font-family: "Barlow Condensed"; font-weight: 600; font-style: normal; font-display: swap; src: url("../fonts/barlow-condensed-latin-600-normal.woff2") format("woff2"); }
+@font-face { font-family: "Barlow Condensed"; font-weight: 700; font-style: normal; font-display: swap; src: url("../fonts/barlow-condensed-latin-700-normal.woff2") format("woff2"); }
+
+:root {
+  color-scheme: light;
+
+  --brand: #0E5A6B;
+  --brand-ink: #FFFFFF;
+  --brand-soft: color-mix(in srgb, var(--brand) 9%, white);
+  --brand-line: color-mix(in srgb, var(--brand) 30%, white);
+
+  --ink: #1C2430;
+  --ink-2: #4A5666;
+  --ink-3: #66717F;
+  --paper: #F5F6F8;
+  --surface: #FFFFFF;
+  --line: #DDE1E7;
+  --line-strong: #C2C9D2;
+
+  --overdue: #B3261E;  --overdue-bg: #FCEAE8;
+  --soon: #8A5300;     --soon-bg: #FFF1D6;
+  --ok: #1D6B45;       --ok-bg: #E3F3EA;
+  --quiet: #536073;    --quiet-bg: #E9EDF2;
+  --info: #1F4F9C;     --info-bg: #E6EEFA;
+
+  --plate: #F7D117;
+  --plate-ink: #111111;
+  --plate-band: #0A3D91;
+
+  --font-ui: "Atkinson Hyperlegible Next", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-plate: "Barlow Condensed", "Arial Narrow", "Helvetica Neue", sans-serif;
+
+  --radius: 6px;
+  --radius-lg: 10px;
+  --side-w: 236px;
+}
