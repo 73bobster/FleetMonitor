@@ -1,5 +1,5 @@
 // The signed-in frame: sidebar on desktop, tab bar on mobile, brand colours, org switcher.
-import { html, mount, on, icon, openModal, closeModal } from './ui.js';
+import { html, mount, on, icon, openModal, closeModal, logoImg, wireLogos } from './ui.js';
 import { state, can, ROLE_LABEL } from './state.js';
 import * as api from './api.js';
 
@@ -28,12 +28,14 @@ export function applyBrand(org) {
   const primary = org?.brand?.colours?.primary;
   const lum = luminance(primary);
   if (lum === null) {
-    root.style.removeProperty('--brand'); root.style.removeProperty('--brand-ink');
+    root.style.removeProperty('--brand'); root.style.removeProperty('--brand-ink'); root.style.removeProperty('--accent');
   } else {
     root.style.setProperty('--brand', primary);
     root.style.setProperty('--brand-ink', lum > 0.4 ? '#111111' : '#FFFFFF');
   }
-  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', primary || '#0E5A6B');
+  const accent = org?.brand?.colours?.accent;
+  if (luminance(accent) !== null) root.style.setProperty('--accent', accent);
+  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', primary || '#FF0066');
   document.title = org ? `${org.name} fleet` : 'FleetMonitor';
 }
 
@@ -42,12 +44,12 @@ const navLink = (n, cls) => html`<a class="${cls}" href="${n.href}" data-nav="${
 
 export function renderShell({ onSwitchOrg, onSignOut }) {
   const org = state.org;
-  const logo = api.logoUrl(org.brand?.logo_path);
+  const logo = api.logoUrl(org.brand);
   applyBrand(org);
   mount(document.getElementById('app'), html`
     <div class="shell">
       <aside class="side">
-        <div class="side-brand">${logo ? html`<img class="side-logo" src="${logo}" alt="">` : ''}<span class="side-name">${org.name}</span></div>
+        <div class="side-brand">${logoImg(logo, org.name, 'side-name')}</div>
         <nav class="side-nav" aria-label="Main">${visibleNav().map((n) => navLink(n, 'side-link'))}</nav>
         <div class="side-foot">
           ${state.memberships.length > 1 ? html`<label class="side-switch"><span>Organisation</span><select id="org-switch">${state.memberships.map((m) => html`<option value="${m.organisation_id}" ${m.organisation_id === org.id ? 'selected' : ''}>${m.organisation.name}</option>`)}</select></label>` : ''}
@@ -55,13 +57,14 @@ export function renderShell({ onSwitchOrg, onSignOut }) {
           <button class="side-signout" type="button" data-action="signout">Sign out</button>
         </div>
       </aside>
-      <div class="content"><header class="mobile-brand">${logo ? html`<img class="side-logo" src="${logo}" alt="">` : ''}<span>${org.name}</span></header><main id="main" tabindex="-1"></main></div>
+      <div class="content"><header class="mobile-brand">${logoImg(logo, org.name)}</header><main id="main" tabindex="-1"></main></div>
       <nav class="tabbar" aria-label="Main">
         ${NAV.filter((n) => TABS.includes(n.id)).map((n) => navLink(n, 'tab-link'))}
         <button type="button" class="tab-link" data-action="more">${icon('more')}<span>More</span></button>
       </nav>
     </div>`);
   const root = document.getElementById('app');
+  wireLogos(root);
   on(root, {
     signout: () => onSignOut(),
     more: () => openMenu(onSignOut),

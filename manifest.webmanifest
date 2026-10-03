@@ -4,7 +4,7 @@
   "start_url": "./#/tasks",
   "scope": "./",
   "display": "standalone",
-  "background_color": "#F5F6F8",
-  "theme_color": "#0E5A6B",
+  "background_color": "#FFFFFF",
+  "theme_color": "#FF0066",
   "icons": [{ "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }]
 }

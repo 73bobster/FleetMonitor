@@ -72,6 +72,21 @@ export function formatReg(reg) {
 }
 export const plate = (reg) => html`<span class="plate" role="img" aria-label="Registration ${formatReg(reg)}">${formatReg(reg)}</span>`;
 
+// A logo image that falls back to the organisation's name as text if the picture cannot load.
+export const logoImg = (url, name, extraClass = '') => (url
+  ? html`<img class="logo" src="${url}" alt="${name}" data-name="${name}" data-class="${extraClass}" referrerpolicy="no-referrer">`
+  : html`<span class="logo-text ${extraClass}">${name}</span>`);
+export function wireLogos(root) {
+  root.querySelectorAll('img.logo').forEach((img) => {
+    img.addEventListener('error', () => {
+      const s = document.createElement('span');
+      s.className = `logo-text ${img.dataset.class || ''}`.trim();
+      s.textContent = img.dataset.name || '';
+      img.replaceWith(s);
+    }, { once: true });
+  });
+}
+
 export const pill = (status) => html`<span class="pill pill-${status}">${STATUS_LABEL[status] || status}</span>`;
 export const loadingHtml = (text = 'Loading') => html`<p class="loading" role="status">${text}</p>`;
 export const emptyHtml = (title, text = '', actionHtml = '') => html`<div class="empty"><h2>${title}</h2>${text ? html`<p>${text}</p>` : ''}${actionHtml}</div>`;

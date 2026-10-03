@@ -58,9 +58,12 @@ export async function loadMemberships(userId) {
   return mem.map((m) => ({ ...m, organisation: byId.get(m.organisation_id) })).filter((m) => m.organisation);
 }
 export const acceptInvitation = async (token) => ok(await sb.rpc('accept_invitation', { p_token: token }));
-export function logoUrl(path) {
-  if (!path) return null;
-  return sb.storage.from('org-branding').getPublicUrl(path).data.publicUrl;
+// brand.logo_url is a full address; brand.logo_path is a file in the org-branding storage bucket.
+export function logoUrl(brand) {
+  if (!brand) return null;
+  if (brand.logo_url) return brand.logo_url;
+  if (brand.logo_path) return sb.storage.from('org-branding').getPublicUrl(brand.logo_path).data.publicUrl;
+  return null;
 }
 
 // ---- Tasks and compliance ------------------------------------------------
