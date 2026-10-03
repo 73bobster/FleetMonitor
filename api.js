@@ -121,6 +121,13 @@ export async function saveDepot(values, id) {
   return ok(await sb.from('depots').insert({ ...values, organisation_id: org() }).select().single());
 }
 
+// ---- Vehicles needed: the minimum by vehicle type and day of the week (read by the Planner) ----
+export const listVehicleRequirements = async () =>
+  ok(await sb.from('vehicle_requirements').select('*').eq('organisation_id', org()).order('category'));
+// rows: [{ category, mon, tue, wed, thu, fri, sat, sun }]. One row per vehicle type, created or updated.
+export const saveVehicleRequirements = async (rows) =>
+  ok(await sb.from('vehicle_requirements').upsert(rows.map((r) => ({ ...r, organisation_id: org() })), { onConflict: 'organisation_id,category' }).select());
+
 // ---- Vehicles ---------------------------------------------------------------
 export const listVehicles = async () =>
   ok(await sb.from('vehicle_overview').select('*').eq('organisation_id', org()).order('registration'));

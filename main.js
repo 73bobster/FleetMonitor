@@ -16,6 +16,7 @@ import { auditView } from './audit.js';
 import { dashboardView } from './dashboard.js';
 import { reportsView } from './reports.js';
 import { garagesView } from './garages.js';
+import { plannerView } from './planner.js';
 import { placeholder } from './placeholder.js';
 
 const INVITE_KEY = 'fm:invite';
@@ -39,6 +40,7 @@ function captureInvite() {
 // ---- Routes ---------------------------------------------------------------------
 route('/dashboard', 'dashboard', (m) => dashboardView(m));
 route('/tasks', 'tasks', (m, p, q) => tasksView(m, q));
+route('/planner', 'planner', (m) => plannerView(m));
 route('/garages', 'garages', (m) => garagesView(m));
 route('/vehicles', 'vehicles', (m) => vehiclesList(m));
 route('/vehicles/new', 'vehicles', (m) => vehicleForm(m, { id: 'new' }));

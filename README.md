@@ -8,19 +8,20 @@ Every file sits in one folder, so it uploads to GitHub with no folders to drag. 
 - **Tasks:** everything coming due, filterable by type and status, from compliance dates, insurance renewals, convictions, fines, accidents, lease ends, vehicles with no cover, garage bookings, vehicles overdue back from the garage, and SORN
 - **Vehicles:** list, add, edit, dispose of, archive and restore; compliance, drivers, insurance cover, availability, incidents, costs, documents, mileage and history tabs
 - **Availability:** garage visits (booked, current, finished) with the garage validated against the Garages list, and long-term off the road with a SORN
+- **Planner:** looks ahead 2 to 8 weeks. Vehicles down the side and days across, with garage visits, SORN, lease ends and due dates, and for each vehicle type the number available against the number needed that day. Days when you are short are flagged, along with days at risk and due dates with no garage visit booked
 - **Garages:** the master list with contact name, email, phone and types of work, plus a built-in Unknown garage
 - **Drivers:** work and personal phones, licence details, points and convictions, employment periods with leave and rehire, incidents, documents, history
 - **Incidents:** accidents, damage and fines in one register, with costs and deadlines
 - **Insurance:** policies, vehicles covered, claims, documents
 - **Reports:** vehicle damage (including accident damage), accidents, vehicle mileage, vehicle status; any period; download as Excel or PDF
-- **Settings** (superuser): depots. **Audit log** (fleet admins and superuser): searchable by period, vehicle and driver
+- **Settings** (superuser): vehicles needed (the minimum of each vehicle type for each day of the week, read by the Planner) and depots. **Audit log** (fleet admins and superuser): searchable by period, vehicle and driver
 - **Documents:** upload from files, a folder, the phone camera, a webcam, or drag and drop
 
 ## Files
 
 - `index.html`: the page. `config.js`: Supabase URL, public key and the sign-in screen branding.
 - `main.js`, `api.js`, `ui.js`, `actions.js`, `docs.js`, `exports.js`, `auth.js`, `shell.js`, `router.js`, `state.js`, `domain.js`: the app. `exports.js` builds the Excel and PDF files with no outside library.
-- `dashboard.js`, `availability-chart.js`, `reports.js`, `insight.js`, `tasks.js`, `vehicles.js`, `availability.js`, `garages.js`, `drivers.js`, `incidents.js`, `insurance.js`, `settings.js`, `audit.js`, `history.js`, `placeholder.js`: one file per screen or shared screen logic.
+- `dashboard.js`, `availability-chart.js`, `planner.js`, `reports.js`, `insight.js`, `tasks.js`, `vehicles.js`, `availability.js`, `garages.js`, `drivers.js`, `incidents.js`, `insurance.js`, `settings.js`, `audit.js`, `history.js`, `placeholder.js`: one file per screen or shared screen logic.
 - `theme.css`, `app.css`: styles. `supabase.js`: the Supabase client library (version 2.117.2). `*.woff2`: fonts (Cascadia Code and Barlow Condensed, both open licence).
 
 ## Branding

@@ -6,6 +6,7 @@ import * as api from './api.js';
 const NAV = [
   { id: 'dashboard', label: 'Dashboard', href: '#/dashboard' },
   { id: 'tasks', label: 'Tasks', href: '#/tasks' },
+  { id: 'planner', label: 'Planner', href: '#/planner' },
   { id: 'vehicles', label: 'Vehicles', href: '#/vehicles' },
   { id: 'drivers', label: 'Drivers', href: '#/drivers' },
   { id: 'incidents', label: 'Incidents', href: '#/incidents' },

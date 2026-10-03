@@ -1,13 +1,13 @@
 // Turns audit-log entries into plain sentences. Used by the History tabs and the Audit log screen.
 import * as api from './api.js';
 import { html, plate, fmtDateTime, fmtDateShort, fmtMoney } from './ui.js';
-import { driverName, INCIDENT_KIND_LABEL, FINE_TYPE_LABEL, LEAVING_REASON_LABEL, DISPOSAL_REASON_LABEL, LICENCE_STATUS_LABEL } from './domain.js';
+import { driverName, CATEGORY_NOUN, INCIDENT_KIND_LABEL, FINE_TYPE_LABEL, LEAVING_REASON_LABEL, DISPOSAL_REASON_LABEL, LICENCE_STATUS_LABEL } from './domain.js';
 
 export const TABLE_LABEL = {
   vehicles: 'Vehicle', drivers: 'Driver', driver_sensitive: 'Driver licence details', licence_checks: 'Licence check', vehicle_assignments: 'Driver assignment',
   compliance_items: 'Compliance item', compliance_renewals: 'Renewal', compliance_types: 'Compliance type', task_states: 'Task', insurance_policies: 'Insurance policy',
   policy_vehicles: 'Insurance cover', insurance_claims: 'Claim', incidents: 'Incident', driver_convictions: 'Conviction', driver_periods: 'Employment', documents: 'Document',
-  vehicle_costs: 'Cost', depots: 'Depot', contacts: 'Contact', organisations: 'Organisation settings', memberships: 'User access', invitations: 'Invitation',
+  vehicle_costs: 'Cost', depots: 'Depot', vehicle_requirements: 'Vehicles needed', contacts: 'Contact', organisations: 'Organisation settings', memberships: 'User access', invitations: 'Invitation',
   support_grants: 'Support access', message_templates: 'Message template', odometer_readings: 'Mileage reading', external_links: 'External link', integration_connections: 'Integration',
 };
 const FIELD = { mobile_work: 'work mobile', mobile_personal: 'personal mobile', company_phone: 'company phone', gross_weight_kg: 'gross weight', payload_kg: 'payload', licence_number: 'licence number', date_of_birth: 'date of birth' };
@@ -90,6 +90,9 @@ function describe(e, L) {
       break;
     case 'odometer_readings':
       if (e.action === 'INSERT') return html`logged a mileage reading of ${n.mileage}`;
+      break;
+    case 'vehicle_requirements':
+      if (e.action !== 'DELETE') return html`${e.action === 'INSERT' ? 'set' : 'changed'} the number of ${CATEGORY_NOUN[row.category]?.[1] || 'vehicles'} needed`;
       break;
     default:
   }
