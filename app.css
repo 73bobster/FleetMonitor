@@ -398,15 +398,20 @@ table.report { min-width: 980px; }
 .chart-legend span { display: inline-flex; align-items: center; gap: 6px; }
 .swatch { display: inline-block; width: 12px; height: 12px; border-radius: 2px; border: 1px solid rgba(0, 0, 0, .18); }
 .sw-un-van { background: #FF0066; }
-.sw-un-hgv { background: repeating-linear-gradient(45deg, rgba(255, 255, 255, .55) 0 2px, transparent 2px 5px), #8A1538; }
-.sw-av-van { background: #C9D3DB; }
-.sw-av-hgv { background: repeating-linear-gradient(45deg, rgba(255, 255, 255, .55) 0 2px, transparent 2px 5px), #8FA0AD; }
+.sw-un-hgv { background: repeating-linear-gradient(45deg, rgba(255, 255, 255, .4) 0 2px, transparent 2px 5px), #B3122E; }
+.sw-av-van { background: #6CC24A; }
+.sw-av-hgv { background: repeating-linear-gradient(45deg, rgba(255, 255, 255, .4) 0 2px, transparent 2px 5px), #1B7A3E; }
 .avail-chart { width: 100%; min-height: 200px; }
 .avail-chart svg { display: block; max-width: 100%; height: auto; }
 .avail-chart .seg-un-van { fill: #FF0066; }
-.avail-chart .seg-un-hgv { fill: #8A1538; }
-.avail-chart .seg-av-van { fill: #C9D3DB; }
-.avail-chart .seg-av-hgv { fill: #8FA0AD; }
+.avail-chart .seg-un-hgv { fill: #B3122E; }
+.avail-chart .seg-av-van { fill: #6CC24A; }
+.avail-chart .seg-av-hgv { fill: #1B7A3E; }
+.avail-chart .seg-num { font-family: var(--font-ui); font-weight: 700; fill: #fff; pointer-events: none; paint-order: stroke; stroke-width: 3px; stroke-linejoin: round; }
+.avail-chart .seg-un-van-num { stroke: #FF0066; }
+.avail-chart .seg-un-hgv-num { stroke: #B3122E; }
+.avail-chart .seg-av-van-num { fill: #10300A; stroke: #6CC24A; }
+.avail-chart .seg-av-hgv-num { stroke: #1B7A3E; }
 .avail-chart .grid-line { stroke: #E3E3E3; stroke-width: 1; }
 .avail-chart .axis-text { font: 400 10px var(--font-ui); fill: #555; }
 .avail-chart .bar { cursor: pointer; outline: none; }

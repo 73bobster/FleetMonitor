@@ -8,7 +8,7 @@ import { buildAvailabilitySeries, chartSvg, chartLegendHtml, numbersTableHtml, d
 
 const sum = (list, f) => list.reduce((s, x) => s + Number(f(x) || 0), 0);
 const link = (href, content, cls = '') => html`<a class="${cls}" href="${href}">${content}</a>`;
-const DRIVERS_SHOWN = 10;
+const DRIVERS_SHOWN = 5;   // the drivers panel lists only the worst offenders
 
 export async function dashboardView(main) {
   mount(main, html`<header class="page-head"><h1>Dashboard</h1></header>${loadingHtml('Loading the dashboard')}`);
@@ -23,9 +23,9 @@ export async function dashboardView(main) {
   const today = todayStr();
   const vById = new Map(vehicles.map((v) => [v.id, v]));
   const gById = new Map(garages.map((g) => [g.id, g]));
+  const dById = new Map(drivers.map((d) => [d.id, d]));
   const live = vehicles.filter((v) => v.status !== 'disposed' && !v.archived_at);
   const liveEvents = events.filter((e) => !e.cancelled_at);
-  let showAllDrivers = false;
   let changing = 0;
   let observer = null; let drawnWidth = 0; let selectedBar = null;
 
@@ -85,13 +85,14 @@ export async function dashboardView(main) {
     const lostDays = sum(touched, (e) => eventDaysInPeriod(e, p, today));
     const garageVisits = touched.filter((e) => e.reason !== 'off_road');
 
-    // ---- drivers: points, then accidents and damage together ----
+    // ---- drivers: the worst offenders only, by points, then accidents and damage together ----
     const rows = drivers.filter((d) => d.employment_status === 'active').map((d) => {
       const cs = convictions.filter((c) => c.driver_id === d.id && c.status === 'live' && c.points > 0);
       const a = accidents.filter((i) => i.driver_id === d.id).length; const dm = damage.filter((i) => i.driver_id === d.id).length;
       return { d, points: sum(cs.filter((c) => c.licence_until >= today), (c) => c.points), totting: sum(cs.filter((c) => c.totting_until >= today), (c) => c.points), accidents: a, damage: dm, combined: a + dm };
     }).sort((x, y) => (can.sensitive ? y.points - x.points : 0) || y.combined - x.combined || driverName(x.d).localeCompare(driverName(y.d)));
-    const shown = showAllDrivers ? rows : rows.slice(0, DRIVERS_SHOWN);
+    const offenders = rows.filter((r) => (can.sensitive && (r.points || r.totting)) || r.combined);
+    const shown = offenders.slice(0, DRIVERS_SHOWN);
     const series = buildAvailabilitySeries(vehicles, liveEvents, p, today);
     const t = series.totals;
 
@@ -137,7 +138,7 @@ export async function dashboardView(main) {
       </div>
 
       <section class="dash-panel wide avail-panel"><h2>Vehicle availability</h2>
-        <p class="muted drivers-note">Vehicles available and unavailable, by ${series.unit}${series.unit === 'day' ? '' : ' (daily averages)'}. Unavailable is at the bottom of each bar, so you can see how much of the fleet was out of action. Vans and HGVs are different colours.</p>
+        <p class="muted drivers-note">Vehicles available and unavailable, by ${series.unit}${series.unit === 'day' ? '' : ' (daily averages)'}. Unavailable (red and pink) is at the bottom of each bar and available (green) is above it. HGVs are the darker, striped shade. Each block shows its number of vehicles where there is room.</p>
         ${chartLegendHtml()}
         <div class="avail-chart" id="avail-chart"></div>
         <p class="chart-detail" id="avail-detail" aria-live="polite">Tap or click a bar for the numbers.</p>
@@ -154,7 +155,8 @@ export async function dashboardView(main) {
             <tr><th>Fines</th><td class="num">${fmtMoney(fineTotal)}</td></tr>
             <tr class="total"><th>Cost to the company, before insurers</th><td class="num">${fmtMoney(incidentSpend)}</td></tr>
           </tbody></table>
-          ${inc.length ? html`<h3>Most recent</h3><ul class="plain">${inc.slice(0, 5).map((i) => html`<li>${link(`#/incidents/${i.id}`, `${fmtDateShort(i.incident_date)} ${incidentTitle(i)}`)} ${i.vehicle_id && vById.get(i.vehicle_id) ? plate(vById.get(i.vehicle_id).registration) : ''} <span class="muted">${incidentCost(i) ? fmtMoney(incidentCost(i)) : ''}</span></li>`)}</ul>` : html`<p class="muted">Nothing recorded in this period.</p>`}
+          ${inc.length ? html`<h3>Most recent</h3><ul class="plain">${inc.slice(0, 5).map((i) => html`<li>${link(`#/incidents/${i.id}`, `${fmtDateShort(i.incident_date)} ${incidentTitle(i)}`)} ${i.vehicle_id && vById.get(i.vehicle_id) ? plate(vById.get(i.vehicle_id).registration) : ''}
+            ${dById.get(i.driver_id) ? link(`#/drivers/${i.driver_id}`, driverName(dById.get(i.driver_id))) : html`<span class="muted">${i.driver_id ? 'Archived driver' : 'No driver recorded'}</span>`} <span class="muted">${incidentCost(i) ? fmtMoney(incidentCost(i)) : ''}</span></li>`)}</ul>` : html`<p class="muted">Nothing recorded in this period.</p>`}
           <p><a href="#/reports?report=damage">Vehicle damage report</a> · <a href="#/reports?report=accidents">Accidents report</a></p>
         </section>
         <section class="dash-panel"><h2>Downtime and garages</h2>
@@ -165,9 +167,9 @@ export async function dashboardView(main) {
         </section>
       </div>
 
-      <section class="dash-panel wide"><h2>Drivers</h2>
-        <p class="muted drivers-note">${can.sensitive ? 'Points are on the licence now. ' : ''}Accidents and damage are for the period. Sorted by ${can.sensitive ? 'points, then ' : ''}accidents and damage together.</p>
-        ${rows.length ? html`<table class="grid keep compact drivers-summary"><thead><tr><th>Driver</th>${can.sensitive ? html`<th class="num">Points</th>` : ''}<th class="num">Accidents</th><th class="num">Damage</th><th class="num">Total</th></tr></thead><tbody>
+      <section class="dash-panel wide"><h2>Drivers: top ${DRIVERS_SHOWN}</h2>
+        <p class="muted drivers-note">The ${DRIVERS_SHOWN} drivers with the most ${can.sensitive ? 'points, then the most ' : ''}accidents and damage together. ${can.sensitive ? 'Points are on the licence now. ' : ''}Accidents and damage are for the period.</p>
+        ${shown.length ? html`<table class="grid keep compact drivers-summary"><thead><tr><th>Driver</th>${can.sensitive ? html`<th class="num">Points</th>` : ''}<th class="num">Accidents</th><th class="num">Damage</th><th class="num">Total</th></tr></thead><tbody>
           ${shown.map((r) => html`<tr>
             <td data-label="Driver">${link(`#/drivers/${r.d.id}`, driverName(r.d))}</td>
             ${can.sensitive ? html`<td data-label="Points" class="num ${r.totting >= 12 ? 'n-overdue' : r.totting >= 9 ? 'n-due_soon' : ''}">${r.points ? html`<strong>${r.points}</strong>` : html`<span class="muted">0</span>`}${r.totting >= 6 ? html`<div class="sub">${r.totting} totting up</div>` : ''}</td>` : ''}
@@ -175,11 +177,11 @@ export async function dashboardView(main) {
             <td data-label="Damage" class="num">${r.damage || html`<span class="muted">0</span>`}</td>
             <td data-label="Total" class="num">${r.combined ? html`<strong>${r.combined}</strong>` : html`<span class="muted">0</span>`}</td></tr>`)}
         </tbody></table>
-        ${rows.length > DRIVERS_SHOWN ? html`<p><button type="button" class="btn btn-sm" data-show-drivers>${showAllDrivers ? 'Show fewer drivers' : `Show all ${rows.length} drivers`}</button></p>` : ''}` : html`<p class="muted">There are no active drivers.</p>`}
+        ` : html`<p class="muted">${rows.length ? `No active driver has ${can.sensitive ? 'points, ' : ''}accidents or damage to show.` : 'There are no active drivers.'}</p>`}
+        <p><a href="#/drivers">All drivers</a></p>
       </section>`);
     wirePeriod(main, p, onPeriod);
     drawChart(series);
-    main.querySelector('[data-show-drivers]')?.addEventListener('click', () => { showAllDrivers = !showAllDrivers; render(); });
   }
 
   // costs and mileage depend on the period, so they are fetched again when it changes

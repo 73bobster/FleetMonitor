@@ -73,17 +73,19 @@ export function detailText(series, i) {
 }
 
 // The stacked bars as an SVG sized to its container. Unavailable is at the bottom of each bar so it is easy to compare.
-// Bottom to top: HGV unavailable, vans unavailable, HGV available, vans available. HGV segments are also hatched.
+// Bottom to top: HGV unavailable, vans unavailable, HGV available, vans available. Available is green, unavailable is
+// red and pink. HGV segments are the darker shade and are also hatched. Each segment carries its count where it fits.
 export function chartSvg(series, width = 640) {
   const n = series.buckets.length; const h = width < 480 ? 220 : 260;
   const m = { l: 30, r: 6, t: 8, b: 26 }; const pw = Math.max(40, width - m.l - m.r); const ph = h - m.t - m.b;
   const max = Math.max(1, Math.ceil(Math.max(...series.buckets.map((b) => b.total))));
   const slot = pw / n; const bw = Math.max(2, Math.min(slot * 0.72, 44));
+  const fs = bw >= 24 ? 11 : 10;   // size of the numbers inside the bars
   const y = (v) => m.t + ph - (v / max) * ph;
   const ticks = [...new Set([0, Math.round(max / 2), max])];
   const step = Math.max(1, Math.ceil(n / Math.max(3, Math.floor(pw / 62))));
   let out = `<svg viewBox="0 0 ${width} ${h}" width="${width}" height="${h}" role="group" aria-label="Vehicles available and unavailable by ${series.unit}">`;
-  out += '<defs><pattern id="hatch" width="5" height="5" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="2" height="5" fill="#fff" fill-opacity=".55"/></pattern></defs>';
+  out += '<defs><pattern id="hatch" width="5" height="5" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="2" height="5" fill="#fff" fill-opacity=".4"/></pattern></defs>';
   for (const t of ticks) out += `<line class="grid-line" x1="${m.l}" x2="${width - m.r}" y1="${y(t).toFixed(1)}" y2="${y(t).toFixed(1)}"/><text class="axis-text" x="${m.l - 5}" y="${(y(t) + 3.5).toFixed(1)}" text-anchor="end">${t}</text>`;
   series.buckets.forEach((b, i) => {
     const x0 = m.l + i * slot; const x = x0 + (slot - bw) / 2;
@@ -94,6 +96,9 @@ export function chartSvg(series, width = 640) {
       const top = y(acc + v); const hh = y(acc) - top;
       out += `<rect class="${cls}" x="${x.toFixed(1)}" y="${top.toFixed(1)}" width="${bw.toFixed(1)}" height="${Math.max(0.5, hh).toFixed(1)}"/>`;
       if (hgv) out += `<rect class="hatch" x="${x.toFixed(1)}" y="${top.toFixed(1)}" width="${bw.toFixed(1)}" height="${Math.max(0.5, hh).toFixed(1)}" fill="url(#hatch)"/>`;
+      // the count goes inside the segment whenever the segment is big enough to hold it
+      const label = num(v, series.unit);
+      if (hh >= fs + 3 && label.length * fs * 0.62 + 2 <= bw) out += `<text class="seg-num ${cls}-num" x="${(x + bw / 2).toFixed(1)}" y="${(top + hh / 2).toFixed(1)}" text-anchor="middle" dominant-baseline="central" font-size="${fs}">${label}</text>`;
       acc += v;
     }
     out += '</g>';
