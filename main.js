@@ -13,6 +13,9 @@ import { incidentsList, incidentForm, incidentDetail } from './incidents.js';
 import { insuranceList, policyForm, policyDetail } from './insurance.js';
 import { settingsView } from './settings.js';
 import { auditView } from './audit.js';
+import { dashboardView } from './dashboard.js';
+import { reportsView } from './reports.js';
+import { garagesView } from './garages.js';
 import { placeholder } from './placeholder.js';
 
 const INVITE_KEY = 'fm:invite';
@@ -34,7 +37,9 @@ function captureInvite() {
 }
 
 // ---- Routes ---------------------------------------------------------------------
-route('/tasks', 'tasks', (m) => tasksView(m));
+route('/dashboard', 'dashboard', (m) => dashboardView(m));
+route('/tasks', 'tasks', (m, p, q) => tasksView(m, q));
+route('/garages', 'garages', (m) => garagesView(m));
 route('/vehicles', 'vehicles', (m) => vehiclesList(m));
 route('/vehicles/new', 'vehicles', (m) => vehicleForm(m, { id: 'new' }));
 route('/vehicles/:id/edit', 'vehicles', (m, p) => vehicleForm(m, p));
@@ -51,7 +56,7 @@ route('/insurance', 'insurance', (m) => insuranceList(m));
 route('/insurance/new', 'insurance', (m) => policyForm(m, { id: 'new' }));
 route('/insurance/:id/edit', 'insurance', (m, p) => policyForm(m, p));
 route('/insurance/:id', 'insurance', (m, p, q) => policyDetail(m, p, q));
-route('/reports', 'reports', (m) => placeholder(m, 'Reports', 'Compliance and cost reports, with CSV export, arrive in a later update.'));
+route('/reports', 'reports', (m, p, q) => reportsView(m, p, q));
 route('/audit', 'audit', (m) => auditView(m));
 route('/settings', 'settings', (m) => settingsView(m));
 onRoute(setActive);

@@ -7,29 +7,33 @@ import {
 } from './ui.js';
 import {
   CATEGORY_LABEL, FUEL_LABEL, OWNERSHIP_LABEL, VEHICLE_STATUS_LABEL, DISPOSAL_REASON_LABEL, COST_CATEGORY_LABEL, LICENCE_STATUS_LABEL, BLOCKING_LICENCE,
-  VEHICLE_DOC_CATEGORIES, driverName, vehicleTitle, worstStatus, taskKey,
+  VEHICLE_DOC_CATEGORIES, UNAVAIL_REASON_LABEL, availability, driverName, vehicleTitle, worstStatus, taskKey,
 } from './domain.js';
 import { openTaskPanel } from './actions.js';
 import { navigate } from './router.js';
 import { historyList, auditLookups } from './history.js';
 import { incidentTable } from './incidents.js';
 import { mountDocuments } from './docs.js';
+import { outOfServiceModal, backInServiceModal, extendReturnModal, convertToOffRoadModal, sornDeclaredModal, cancelBookingModal, rescheduleModal } from './availability.js';
 
 const opts = (o) => Object.entries(o);
 
 // ---- List ------------------------------------------------------------------
 export async function vehiclesList(main) {
   mount(main, html`<header class="page-head"><h1>Vehicles</h1></header>${loadingHtml('Loading vehicles')}`);
-  const [vehicles, tasks, drivers, depots] = await Promise.all([api.listVehicles(), api.listTasks(), api.listDrivers(), api.listAllDepots()]);
+  const [vehicles, tasks, drivers, depots, garages] = await Promise.all([api.listVehicles(), api.listTasks(), api.listDrivers(), api.listAllDepots(), api.listGarages()]);
+  const garageName = (id) => garages.find((g) => g.id === id)?.name || 'a garage';
   const driverById = new Map(drivers.map((d) => [d.id, d]));
   const depotById = new Map(depots.map((d) => [d.id, d]));
-  const ui = { q: '', depot: '', category: '', disposed: false, archived: false };
+  const ui = { q: '', depot: '', category: '', avail: '', disposed: false, archived: false };
+  const groupOf = (v) => { const k = availability(v).key; return k === 'booked' ? 'available' : (k === 'sorn' || k === 'off_road_no_sorn') ? 'off_road' : k; };
 
   mount(main, html`
     <header class="page-head"><h1>Vehicles</h1>${can.write ? html`<a class="btn btn-primary" href="#/vehicles/new">Add vehicle</a>` : ''}</header>
     <div class="filters">
       <input type="search" id="v-search" placeholder="Search registration, make or driver" aria-label="Search vehicles">
       ${depots.length ? html`<label class="inline"><span class="sr-only">Depot</span><select id="v-depot"><option value="">All depots</option>${depots.filter((d) => !d.archived_at).map((d) => html`<option value="${d.id}">${d.name}</option>`)}</select></label>` : ''}
+      <label class="inline"><span class="sr-only">Availability</span><select id="v-avail"><option value="">Any availability</option><option value="available">Available</option><option value="garage">At a garage</option><option value="off_road">Off the road</option></select></label>
       <label class="inline"><span class="sr-only">Type</span><select id="v-cat"><option value="">All types</option>${opts(CATEGORY_LABEL).map(([k, l]) => html`<option value="${k}">${l}</option>`)}</select></label>
       <label class="check small"><input type="checkbox" id="v-disposed"> <span>Include disposed</span></label>
       <label class="check small"><input type="checkbox" id="v-archived"> <span>Include archived</span></label>
@@ -40,7 +44,7 @@ export async function vehiclesList(main) {
   function draw() {
     const rows = vehicles.filter((v) =>
       (ui.disposed || v.status !== 'disposed') && (ui.archived || !v.archived_at) &&
-      (!ui.depot || v.depot_id === ui.depot) && (!ui.category || v.category === ui.category) &&
+      (!ui.depot || v.depot_id === ui.depot) && (!ui.category || v.category === ui.category) && (!ui.avail || groupOf(v) === ui.avail) &&
       (!ui.q || [v.registration, v.make, v.model, v.nickname, driverName(driverById.get(v.primary_driver_id))].join(' ').toLowerCase().includes(ui.q)));
     if (!vehicles.length) {
       mount(box, emptyHtml('No vehicles yet', 'Add your first vehicle and its compliance dates will start appearing under Tasks.',
@@ -56,7 +60,7 @@ export async function vehiclesList(main) {
         const live = v.status === 'active' && !v.archived_at;
         return html`<tr>
           <td data-label="Vehicle"><a class="plate-link" href="#/vehicles/${v.id}">${plate(v.registration)}</a>
-            <div class="sub">${vehicleTitle(v)}${v.nickname ? ` (${v.nickname})` : ''}${v.status !== 'active' ? html` <span class="tag">${VEHICLE_STATUS_LABEL[v.status]}</span>` : ''}${v.archived_at ? html` <span class="tag">Archived</span>` : ''}</div></td>
+            <div class="sub">${vehicleTitle(v)}${v.nickname ? ` (${v.nickname})` : ''}${v.status === 'disposed' ? html` <span class="tag">Disposed</span>` : ''}${v.archived_at ? html` <span class="tag">Archived</span>` : ''}${!v.archived_at && v.status !== 'disposed' && !['available'].includes(availability(v).key) ? html` <span class="tag ${['garage', 'booked'].includes(availability(v).key) ? '' : 'tag-warn'}">${availability(v).label}</span>` : ''}</div>${v.unavailable_garage_id && v.unavailable_reason !== 'off_road' ? html`<div class="sub">${UNAVAIL_REASON_LABEL[v.unavailable_reason]} at ${garageName(v.unavailable_garage_id)}${v.unavailable_expected_return ? `, back ${fmtDateShort(v.unavailable_expected_return)}` : ''}</div>` : ''}</td>
           <td data-label="Depot">${depotById.get(v.depot_id)?.name || ''}</td>
           <td data-label="Driver">${v.primary_driver_id ? html`<a href="#/drivers/${v.primary_driver_id}">${driverName(driverById.get(v.primary_driver_id))}</a>` : html`<span class="muted">${live ? 'Unassigned' : ''}</span>`}</td>
           <td data-label="Insurance">${v.insured_until ? html`Until ${fmtDateShort(v.insured_until)}` : live ? html`<span class="c-overdue"><strong>No cover</strong></span>` : ''}</td>
@@ -68,6 +72,7 @@ export async function vehiclesList(main) {
   main.querySelector('#v-search').addEventListener('input', (e) => { ui.q = e.target.value.trim().toLowerCase(); draw(); });
   main.querySelector('#v-depot')?.addEventListener('change', (e) => { ui.depot = e.target.value; draw(); });
   main.querySelector('#v-cat').addEventListener('change', (e) => { ui.category = e.target.value; draw(); });
+  main.querySelector('#v-avail').addEventListener('change', (e) => { ui.avail = e.target.value; draw(); });
   main.querySelector('#v-disposed').addEventListener('change', (e) => { ui.disposed = e.target.checked; draw(); });
   main.querySelector('#v-archived').addEventListener('change', (e) => { ui.archived = e.target.checked; draw(); });
   draw();
@@ -169,7 +174,7 @@ export function disposeModal(v) {
 // ---- Detail ----------------------------------------------------------------
 const TABS = [
   { id: 'overview', label: 'Overview' }, { id: 'compliance', label: 'Compliance' }, { id: 'drivers', label: 'Drivers' }, { id: 'insurance', label: 'Insurance' },
-  { id: 'incidents', label: 'Incidents' }, { id: 'costs', label: 'Costs' }, { id: 'documents', label: 'Documents' }, { id: 'readings', label: 'Readings' },
+  { id: 'availability', label: 'Availability' }, { id: 'incidents', label: 'Incidents' }, { id: 'costs', label: 'Costs' }, { id: 'documents', label: 'Documents' }, { id: 'readings', label: 'Readings' },
   { id: 'history', label: 'History', when: () => can.audit },
 ];
 
@@ -179,16 +184,34 @@ export async function vehicleDetail(main, { id }, query) {
   if (!v) { mount(main, emptyHtml('Vehicle not found', 'It may have been removed.', html`<p><a class="btn" href="#/vehicles">Back to vehicles</a></p>`)); return; }
   const tab = TABS.find((t) => t.id === query.tab && (!t.when || t.when())) ? query.tab : 'overview';
   const disposed = v.status === 'disposed';
+  const garages = await api.listGarages();
+  const av = availability(v);
+  const gname = garages.find((g) => g.id === v.unavailable_garage_id)?.name || 'a garage';
+  const lateBack = v.unavailable_expected_return && v.unavailable_expected_return < todayStr();
+  const again = () => navigate(location.hash);
+  const actionsBar = (list) => (can.write ? html`<div class="banner-actions">${list.map(([a, l]) => html`<button class="btn btn-sm" data-action="${a}">${l}</button>`)}</div>` : '');
+  const availBanner = disposed || v.archived_at ? '' : av.key === 'garage'
+    ? html`<div class="banner-warn"><p>At <strong>${gname}</strong> since ${fmtDate(v.unavailable_since)} for ${UNAVAIL_REASON_LABEL[v.unavailable_reason].toLowerCase()}. ${v.unavailable_expected_return ? html`${lateBack ? html`<strong>Back was due ${fmtDate(v.unavailable_expected_return)}.</strong>` : `Expected back ${fmtDate(v.unavailable_expected_return)}.`}` : 'No return date set.'}</p>${actionsBar([['back-in', 'Back in service'], ['extend', 'Change expected return'], ['to-sorn', 'Record as off the road (SORN)']])}</div>`
+    : av.key === 'sorn' ? html`<div class="banner-info"><p>Off the road since ${fmtDate(v.unavailable_since)}. SORN declared ${fmtDate(v.sorn_declared_on)}. Road tax and no-cover reminders are paused until it goes back in service.</p>${actionsBar([['back-in', 'Back in service']])}</div>`
+    : av.key === 'off_road_no_sorn' && v.unavailable_event_id ? html`<div class="banner-danger"><p><strong>Off the road since ${fmtDate(v.unavailable_since)} with no SORN recorded.</strong> A vehicle that is not on the road must be taxed or have a SORN.</p>${actionsBar([['sorn', 'Record the SORN'], ['back-in', 'Back in service']])}</div>`
+    : av.key === 'off_road_no_sorn' ? html`<div class="banner-warn"><p>Marked as off the road, but there is no record of why or where. Record it properly so the SORN is tracked.</p>${actionsBar([['out-of-service', 'Record it now']])}</div>`
+    : av.key === 'booked' ? html`<div class="banner-info"><p>Booked in on ${fmtDate(v.next_booking_date)}. See the Availability tab for the details.</p></div>` : '';
   mount(main, html`
     <header class="page-head head-vehicle">
       <div><p class="crumb"><a href="#/vehicles">Vehicles</a></p><h1>${plate(v.registration)}</h1><p class="sub">${vehicleTitle(v)}${v.nickname ? ` (${v.nickname})` : ''}${v.status !== 'active' ? html` <span class="tag">${VEHICLE_STATUS_LABEL[v.status]}</span>` : ''}${v.archived_at ? html` <span class="tag">Archived</span>` : ''}</p></div>
-      ${can.write ? html`<div class="head-actions"><a class="btn" href="#/vehicles/${v.id}/edit">Edit</a>${!disposed && !v.archived_at ? html`<button class="btn" data-action="dispose">Dispose</button>` : ''}${v.archived_at ? html`<button class="btn" data-action="restore">Restore</button>` : html`<button class="btn" data-action="archive">Archive</button>`}</div>` : ''}
+      ${can.write ? html`<div class="head-actions"><a class="btn" href="#/vehicles/${v.id}/edit">Edit</a>${!disposed && !v.archived_at && ['available', 'booked'].includes(av.key) ? html`<button class="btn" data-action="out-of-service">Out of service</button>` : ''}${!disposed && !v.archived_at ? html`<button class="btn" data-action="dispose">Dispose</button>` : ''}${v.archived_at ? html`<button class="btn" data-action="restore">Restore</button>` : html`<button class="btn" data-action="archive">Archive</button>`}</div>` : ''}
     </header>
     ${disposed ? html`<p class="banner-info">Disposed of on ${fmtDate(v.disposed_date)} (${DISPOSAL_REASON_LABEL[v.disposal_reason] || v.disposal_reason}).${v.sold_to ? ` Sold to ${v.sold_to}${v.sale_price != null ? ` for ${fmtMoney(v.sale_price)}` : ''}.` : ''} Its records and history stay available.</p>` : ''}
+    ${availBanner}
     ${v.archived_at ? html`<p class="banner-warn">This vehicle is archived: it is hidden from lists and tasks. Restore it to bring it back.</p>` : ''}
     <nav class="tabs" aria-label="Vehicle sections">${TABS.filter((t) => !t.when || t.when()).map((t) => html`<a class="tab" href="#/vehicles/${v.id}?tab=${t.id}" ${t.id === tab ? html`aria-current="page"` : ''}>${t.label}</a>`)}</nav>
     <div id="tab-body">${loadingHtml()}</div>`);
   on(main, {
+    'out-of-service': () => outOfServiceModal(v.id, { onDone: again }),
+    'back-in': () => backInServiceModal(v.unavailable_event_id, { onDone: again }),
+    extend: () => extendReturnModal(v.unavailable_event_id, { onDone: again }),
+    'to-sorn': () => convertToOffRoadModal(v.unavailable_event_id, { onDone: again }),
+    sorn: () => sornDeclaredModal(v.unavailable_event_id, { onDone: again }),
     dispose: () => disposeModal(v),
     restore: async () => { await api.restoreVehicle(v.id); toast('Vehicle restored.'); navigate(`#/vehicles/${v.id}`); },
     archive: () => openModal({
@@ -338,6 +361,35 @@ const TAB_RENDER = {
         body: html`<p>Mark this vehicle as no longer covered by this policy from today. It will then show as having no cover unless it is on another policy.</p>`,
         onSubmit: async () => { await api.endPolicyVehicle(el.dataset.id, today); toast('Cover ended.'); navigate(location.hash); },
       }),
+    });
+  },
+
+  async availability(body, v) {
+    const [events, garages] = await Promise.all([api.listUnavailability(v.id), api.listGarages()]);
+    const gById = new Map(garages.map((g) => [g.id, g]));
+    const today = todayStr();
+    const again = () => navigate(location.hash);
+    const stateOf = (e) => (e.cancelled_at ? 'Cancelled' : e.returned_on ? 'Completed' : e.from_date > today ? 'Booked' : e.reason === 'off_road' ? (e.sorn_declared_on ? 'Off the road (SORN)' : 'Off the road, no SORN') : 'At the garage');
+    const live = v.status !== 'disposed' && !v.archived_at;
+    mount(body, html`
+      ${can.write && live ? html`<p><button class="btn btn-primary" data-action="tab-out">Out of service or book a visit</button></p>` : ''}
+      <p class="muted">Garage visits, bookings and time off the road. A garage must always be named, from the Garages list, or Unknown garage if you do not know. A vehicle that is off the road for a long time needs a SORN.</p>
+      ${events.length ? html`<table class="grid"><thead><tr><th>When</th><th>Why</th><th>Where</th><th>Status</th><th>Notes</th><th></th></tr></thead><tbody>${events.map((e) => html`<tr>
+        <td data-label="When">${fmtDateShort(e.from_date)} to ${e.cancelled_at ? '' : e.returned_on ? fmtDateShort(e.returned_on) : e.expected_return ? html`${fmtDateShort(e.expected_return)} <span class="sub">expected</span>` : e.reason === 'off_road' ? 'open' : 'not set'}</td>
+        <td data-label="Why">${UNAVAIL_REASON_LABEL[e.reason]}</td>
+        <td data-label="Where">${e.reason === 'off_road' ? (e.location_note || 'Off the road') : (gById.get(e.garage_id)?.name || '')}</td>
+        <td data-label="Status">${stateOf(e)}${e.reason === 'off_road' && e.sorn_declared_on ? html`<div class="sub">SORN ${fmtDateShort(e.sorn_declared_on)}</div>` : ''}</td>
+        <td data-label="Notes">${e.notes || ''}</td>
+        <td class="act">${can.write && !e.returned_on ? (e.from_date > today
+          ? html`<button class="btn btn-sm" data-action="reschedule" data-id="${e.id}">Change</button> <button class="btn btn-sm" data-action="cancel" data-id="${e.id}">Cancel</button>`
+          : html`<button class="btn btn-sm" data-action="tab-back" data-id="${e.id}">Back in service</button>${e.reason === 'off_road' && !e.sorn_declared_on ? html` <button class="btn btn-sm" data-action="tab-sorn" data-id="${e.id}">Record SORN</button>` : ''}`) : ''}</td></tr>`)}</tbody></table>`
+        : emptyHtml('No garage visits or time off the road', 'Record each time this vehicle goes to a garage or comes off the road.')}`);
+    on(body, {
+      'tab-out': () => outOfServiceModal(v.id, { onDone: again }),
+      'tab-back': (el) => backInServiceModal(el.dataset.id, { onDone: again }),
+      'tab-sorn': (el) => sornDeclaredModal(el.dataset.id, { onDone: again }),
+      reschedule: (el) => rescheduleModal(el.dataset.id, { onDone: again }),
+      cancel: (el) => cancelBookingModal(el.dataset.id, { onDone: again }),
     });
   },
 

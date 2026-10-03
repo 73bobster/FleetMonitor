@@ -289,3 +289,56 @@ fieldset.pick { margin: 14px 0 0; display: grid; gap: 10px; max-height: 280px; o
   .grid tfoot, .grid tfoot tr { display: block; }
   .grid tfoot td { display: flex; justify-content: space-between; padding: 9px 14px; }
 }
+
+/* ---- Dashboard, reports, availability ---- */
+.brand-link { display: inline-block; text-decoration: none; color: inherit; }
+.brand-link:focus-visible { outline: 3px solid var(--brand); outline-offset: 3px; }
+.period { display: flex; flex-wrap: wrap; align-items: end; gap: 12px 18px; margin-bottom: 8px; }
+.period .seg { flex-wrap: wrap; }
+.period-note { margin: 4px 0 18px; font-size: .8125rem; }
+.figures { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 0; margin-bottom: 26px; border: 1px solid var(--line-strong); border-radius: var(--radius-lg); background: var(--surface); overflow: hidden; }
+.figures.small { margin-bottom: 18px; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); }
+.figure { display: grid; align-content: start; gap: 2px; padding: 16px 18px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); color: var(--ink); text-decoration: none; margin: 0 -1px -1px 0; }
+a.figure:hover { background: #FAFAFA; }
+a.figure:focus-visible { outline: 3px solid var(--brand); outline-offset: -3px; }
+.figure-value { font: 700 1.75rem/1.1 var(--font-ui); letter-spacing: -.01em; }
+.figure-label { font-size: .75rem; font-weight: 700; text-transform: uppercase; letter-spacing: .03em; color: var(--ink-2); }
+.figure-sub { font-size: .75rem; color: var(--ink-3); }
+.figure.tone-bad .figure-value { color: var(--overdue); }
+.figure.tone-warn .figure-value { color: var(--soon); }
+.figure.tone-good .figure-value { color: var(--ok); }
+.dash-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; margin-bottom: 24px; align-items: start; }
+.dash-panel { padding: 18px 20px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-lg); }
+.dash-panel.wide { margin-bottom: 24px; }
+.dash-panel h2 { margin: 0 0 12px; font-size: 1rem; text-transform: uppercase; letter-spacing: .02em; }
+.dash-panel h3 { margin: 16px 0 6px; font-size: .75rem; text-transform: uppercase; letter-spacing: .04em; color: var(--ink-2); }
+.dash-panel p { margin: 12px 0 0; font-size: .875rem; }
+table.mini { width: 100%; border-collapse: collapse; font-size: .875rem; }
+table.mini th { padding: 6px 0; font-weight: 400; text-align: left; color: var(--ink-2); border-bottom: 1px solid var(--line); }
+table.mini td { padding: 6px 0; border-bottom: 1px solid var(--line); text-align: right; font-variant-numeric: tabular-nums; }
+table.mini tr.total th, table.mini tr.total td { font-weight: 700; color: var(--ink); border-bottom: 2px solid var(--line-strong); }
+table.mini tr.bad th, table.mini tr.bad td { color: var(--overdue); font-weight: 700; }
+table.mini.spaced { margin-top: 18px; }
+ul.attn { list-style: none; margin: 0; padding: 0; }
+ul.attn li { border-bottom: 1px solid var(--line); }
+ul.attn a { display: grid; grid-template-columns: auto 1fr auto; gap: 4px 12px; align-items: center; padding: 8px 0; color: inherit; text-decoration: none; font-size: .875rem; }
+ul.attn a:hover .attn-name { text-decoration: underline; }
+.attn-due { text-align: right; white-space: nowrap; }
+ul.plain { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; font-size: .875rem; }
+.grid.compact td, .grid.compact th { padding-top: 9px; padding-bottom: 9px; }
+td.num a, td.num a:visited { font-weight: 700; text-decoration: none; }
+td.num a.n-overdue { color: var(--overdue); }
+td.num a.n-due_soon { color: var(--soon); }
+.report-actions { display: flex; gap: 10px; margin: 0 0 18px; flex-wrap: wrap; }
+.scroll { overflow-x: auto; border-radius: var(--radius); }
+table.report { min-width: 980px; }
+.tag-warn { background: var(--soon-bg); color: var(--soon); border-color: #D98A00; }
+.banner-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.banner-warn p, .banner-info p, .banner-danger p { margin: 0; }
+@media (max-width: 860px) {
+  .dash-grid { grid-template-columns: 1fr; }
+  .tabbar { grid-template-columns: repeat(5, 1fr) !important; }
+  .figure-value { font-size: 1.5rem; }
+  table.report { min-width: 0; }
+  .scroll { overflow: visible; }
+}

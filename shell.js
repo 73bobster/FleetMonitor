@@ -4,16 +4,18 @@ import { state, can, ROLE_LABEL } from './state.js';
 import * as api from './api.js';
 
 const NAV = [
+  { id: 'dashboard', label: 'Dashboard', href: '#/dashboard' },
   { id: 'tasks', label: 'Tasks', href: '#/tasks' },
   { id: 'vehicles', label: 'Vehicles', href: '#/vehicles' },
   { id: 'drivers', label: 'Drivers', href: '#/drivers' },
   { id: 'incidents', label: 'Incidents', href: '#/incidents' },
+  { id: 'garages', label: 'Garages', href: '#/garages' },
   { id: 'insurance', label: 'Insurance', href: '#/insurance' },
   { id: 'reports', label: 'Reports', href: '#/reports' },
   { id: 'audit', label: 'Audit log', href: '#/audit', when: () => can.audit },
   { id: 'settings', label: 'Settings', href: '#/settings', when: () => can.configure },
 ];
-const TABS = ['tasks', 'vehicles', 'drivers'];
+const TABS = ['dashboard', 'tasks', 'vehicles', 'drivers'];
 const visibleNav = () => NAV.filter((n) => !n.when || n.when());
 
 // ---- Brand ------------------------------------------------------------------
@@ -50,7 +52,7 @@ export function renderShell({ onSwitchOrg, onSignOut }) {
   mount(document.getElementById('app'), html`
     <div class="shell">
       <aside class="side">
-        <div class="side-brand">${logoImg(logo, org.name, 'side-name')}</div>
+        <div class="side-brand"><a class="brand-link" href="#/dashboard" aria-label="${org.name}: go to the dashboard">${logoImg(logo, org.name, 'side-name')}</a></div>
         <nav class="side-nav" aria-label="Main">${visibleNav().map((n) => navLink(n, 'side-link'))}</nav>
         <div class="side-foot">
           ${state.memberships.length > 1 ? html`<label class="side-switch"><span>Organisation</span><select id="org-switch">${state.memberships.map((m) => html`<option value="${m.organisation_id}" ${m.organisation_id === org.id ? 'selected' : ''}>${m.organisation.name}</option>`)}</select></label>` : ''}
@@ -58,7 +60,7 @@ export function renderShell({ onSwitchOrg, onSignOut }) {
           <button class="side-signout" type="button" data-action="signout">Sign out</button>
         </div>
       </aside>
-      <div class="content"><header class="mobile-brand">${logoImg(logo, org.name)}</header><main id="main" tabindex="-1"></main></div>
+      <div class="content"><header class="mobile-brand"><a class="brand-link" href="#/dashboard" aria-label="${org.name}: go to the dashboard">${logoImg(logo, org.name)}</a></header><main id="main" tabindex="-1"></main></div>
       <nav class="tabbar" aria-label="Main">
         ${NAV.filter((n) => TABS.includes(n.id)).map((n) => navLink(n, 'tab-link'))}
         <button type="button" class="tab-link" data-action="more">${icon('more')}<span>More</span></button>

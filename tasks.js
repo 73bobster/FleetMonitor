@@ -2,18 +2,19 @@
 import * as api from './api.js';
 import { can } from './state.js';
 import { html, mount, on, pill, fmtDate, dueText, loadingHtml, emptyHtml, plural } from './ui.js';
-import { STATUS_LABEL, STATUS_ORDER, driverName, taskKey } from './domain.js';
+import { STATUS_LABEL, STATUS_ORDER, TASK_CATEGORIES, driverName, taskKey, taskCategory } from './domain.js';
 import { openTaskPanel, taskWho, quickButton, runAction } from './actions.js';
 import { setBadge } from './shell.js';
 
 const KINDS = [['all', 'All'], ['vehicle', 'Vehicles'], ['driver', 'Drivers'], ['incident', 'Incidents'], ['policy', 'Insurance']];
 
-export async function tasksView(main) {
+export async function tasksView(main, query = {}) {
   mount(main, html`<header class="page-head"><h1>Tasks</h1></header>${loadingHtml('Loading tasks')}`);
   const [initialTasks, depots, vehicles, drivers] = await Promise.all([api.listTasks(), api.listDepots(), api.listVehicles(), api.listDrivers()]);
   let tasks = initialTasks;
   const ctx = { vehicles: new Map(vehicles.map((v) => [v.id, v])), drivers: new Map(drivers.map((d) => [d.id, d])) };
-  const ui = { kind: 'all', depot: '', q: '', quiet: false, open: new Set(['overdue', 'due_soon', 'no_date']) };
+  const ui = { kind: 'all', depot: '', q: '', quiet: false, category: TASK_CATEGORIES.some((c) => c[0] === query.category) ? query.category : '', status: STATUS_ORDER.includes(query.status) ? query.status : '', open: new Set(['overdue', 'due_soon', 'no_date']) };
+  if (ui.status) ui.open.add(ui.status);
 
   const searchText = (t) => {
     const v = t.vehicle_id ? ctx.vehicles.get(t.vehicle_id) : null;
@@ -22,7 +23,7 @@ export async function tasksView(main) {
   };
   const filtered = () => tasks.filter((t) =>
     (ui.kind === 'all' || t.applies_to === ui.kind) &&
-    (!ui.depot || t.depot_id === ui.depot) &&
+    (!ui.depot || t.depot_id === ui.depot) && (!ui.category || taskCategory(t) === ui.category) && (!ui.status || t.status === ui.status) &&
     (!ui.q || searchText(t).includes(ui.q)));
   const byKey = (k) => tasks.find((t) => taskKey(t) === k);
 
@@ -31,6 +32,8 @@ export async function tasksView(main) {
     <div class="filters">
       <div class="seg" role="group" aria-label="Show">${KINDS.map(([k, l]) => html`<button type="button" class="seg-btn" data-action="kind" data-kind="${k}" aria-pressed="${String(k === ui.kind)}">${l}</button>`)}</div>
       ${depots.length > 1 ? html`<label class="inline"><span class="sr-only">Depot</span><select id="depot-filter"><option value="">All depots</option>${depots.map((d) => html`<option value="${d.id}">${d.name}</option>`)}</select></label>` : ''}
+      <label class="inline"><span class="sr-only">Type of task</span><select id="cat-filter"><option value="">All types</option>${TASK_CATEGORIES.map(([k, l]) => html`<option value="${k}" ${k === ui.category ? 'selected' : ''}>${l}</option>`)}</select></label>
+      <label class="inline"><span class="sr-only">Status</span><select id="status-filter"><option value="">Any status</option>${['overdue', 'due_soon', 'no_date', 'upcoming'].map((s) => html`<option value="${s}" ${s === ui.status ? 'selected' : ''}>${STATUS_LABEL[s]}</option>`)}</select></label>
       <input type="search" id="task-search" placeholder="Search registration, driver or item" aria-label="Search tasks">
       <label class="check small"><input type="checkbox" id="show-quiet"> <span>Show snoozed and dismissed</span></label>
     </div>
@@ -109,6 +112,8 @@ export async function tasksView(main) {
     nav: (el) => { location.hash = el.getAttribute('href'); },
   });
   main.querySelector('#task-search').addEventListener('input', (e) => { ui.q = e.target.value.trim().toLowerCase(); drawList(); });
+  main.querySelector('#cat-filter').addEventListener('change', (e) => { ui.category = e.target.value; drawList(); });
+  main.querySelector('#status-filter').addEventListener('change', (e) => { ui.status = e.target.value; if (ui.status) ui.open.add(ui.status); drawList(); });
   main.querySelector('#depot-filter')?.addEventListener('change', (e) => { ui.depot = e.target.value; drawList(); });
   main.querySelector('#show-quiet').addEventListener('change', (e) => {
     ui.quiet = e.target.checked;

@@ -59,3 +59,45 @@ export const taskKey = (t) => `${t.source_type}:${t.source_id}:${t.state_key || 
 
 // Licence numbers are compared without spaces and in capitals.
 export const normLicence = (s) => String(s || '').toUpperCase().replace(/\s+/g, '');
+
+// ---- Garages and vehicle availability ----------------------------------------------
+export const UNAVAIL_REASON_LABEL = {
+  servicing: 'Servicing', mot: 'MOT or annual test', tyres: 'Tyres', repair: 'Mechanical repair', accident_repair: 'Accident or bodywork repair',
+  breakdown: 'Breakdown', tacho: 'Tachograph calibration', tail_lift: 'Tail lift', other_garage: 'Other garage visit', off_road: 'Off the road (SORN)',
+};
+export const GARAGE_SERVICE_LABEL = {
+  servicing: 'Servicing', mot: 'MOT and annual tests', tyres: 'Tyres', repairs: 'Mechanical repairs', bodywork: 'Bodywork and accident repair',
+  tacho: 'Tachograph', tail_lift: 'Tail lifts', breakdown: 'Breakdown and recovery', other: 'Other work',
+};
+const REASON_SERVICE = { servicing: 'servicing', mot: 'mot', tyres: 'tyres', repair: 'repairs', accident_repair: 'bodywork', breakdown: 'breakdown', tacho: 'tacho', tail_lift: 'tail_lift' };
+// Does this garage do the kind of work that the reason needs? (The Unknown garage never "suits": it is the fallback.)
+export const garageSuits = (g, reason) => !g.is_unknown && (reason === 'other_garage' || (g.services || []).includes(REASON_SERVICE[reason]));
+export const COST_CATEGORY_FOR_REASON = { servicing: 'servicing', tyres: 'tyres', accident_repair: 'accident', mot: 'other' };
+
+// Where a vehicle is right now, from a vehicle_overview row.
+export function availability(v) {
+  if (v.status === 'disposed') return { key: 'disposed', label: 'Disposed' };
+  if (v.archived_at) return { key: 'archived', label: 'Archived' };
+  if (v.unavailable_event_id && v.unavailable_reason === 'off_road') return { key: v.sorn_declared_on ? 'sorn' : 'off_road_no_sorn', label: v.sorn_declared_on ? 'Off the road (SORN)' : 'Off the road, no SORN yet' };
+  if (v.unavailable_event_id) return { key: 'garage', label: 'At the garage' };
+  if (v.status === 'off_road') return { key: 'off_road_no_sorn', label: 'Off the road, no record' };
+  if (v.next_booking_date) return { key: 'booked', label: 'Available, booked in' };
+  return { key: 'available', label: 'Available' };
+}
+
+// ---- Task categories for the dashboard and the Tasks filter -----------------------------
+export const TASK_CATEGORIES = [
+  ['vehicle_compliance', 'Vehicle compliance'], ['vehicle_status', 'Vehicle status and availability'], ['driver_compliance', 'Driver compliance'],
+  ['convictions', 'Convictions and points'], ['incidents', 'Accidents, damage and fines'], ['insurance', 'Insurance renewals'],
+];
+export function taskCategory(t) {
+  switch (t.type_code) {
+    case 'INSURANCE_RENEWAL': return 'insurance';
+    case 'LEASE_END': case 'VEHICLE_UNINSURED': case 'VEHICLE_DISPOSAL_INSURER': case 'SERVICE_BOOKING':
+    case 'VEHICLE_SORN': case 'VEHICLE_RETURN_OVERDUE': case 'VEHICLE_LONG_ABSENCE': return 'vehicle_status';
+    case 'FINE_PAYMENT': case 'FINE_NOMINATION': case 'INCIDENT_INSURER_NOTICE': return 'incidents';
+    default:
+      if (String(t.type_code).startsWith('CONVICTION_')) return 'convictions';
+      return t.applies_to === 'driver' ? 'driver_compliance' : 'vehicle_compliance';
+  }
+}

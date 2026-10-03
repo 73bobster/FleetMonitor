@@ -4,20 +4,23 @@ Every file sits in one folder, so it uploads to GitHub with no folders to drag. 
 
 ## What it does
 
-- **Tasks:** everything coming due, from vehicle and driver compliance dates, insurance renewals, convictions, fines, accidents, lease ends and vehicles with no cover
-- **Vehicles:** list, add, edit, dispose of, archive and restore; compliance, drivers, insurance cover, incidents, costs, documents, mileage and history tabs
-- **Drivers:** work and personal phones, licence details, points and convictions (with dates worked out for you), employment periods with leave and rehire, incidents, documents, history
+- **Dashboard** (opens first; the logo returns to it): what needs attention, fleet status, tasks by type (vehicle compliance, vehicle status and availability, driver compliance, convictions, accidents and fines, insurance), and, for a reporting period you can change (default last 30 days), accidents and damage, costs, mileage and downtime
+- **Tasks:** everything coming due, filterable by type and status, from compliance dates, insurance renewals, convictions, fines, accidents, lease ends, vehicles with no cover, garage bookings, vehicles overdue back from the garage, and SORN
+- **Vehicles:** list, add, edit, dispose of, archive and restore; compliance, drivers, insurance cover, availability, incidents, costs, documents, mileage and history tabs
+- **Availability:** garage visits (booked, current, finished) with the garage validated against the Garages list, and long-term off the road with a SORN
+- **Garages:** the master list with contact name, email, phone and types of work, plus a built-in Unknown garage
+- **Drivers:** work and personal phones, licence details, points and convictions, employment periods with leave and rehire, incidents, documents, history
 - **Incidents:** accidents, damage and fines in one register, with costs and deadlines
 - **Insurance:** policies, vehicles covered, claims, documents
-- **Settings** (superuser): the master list of depots
-- **Audit log** (fleet admins and superuser): every change, searchable by period, vehicle and driver
-- **Documents:** upload from files, a whole folder, the phone camera, a webcam, or drag and drop
+- **Reports:** vehicle damage (including accident damage), accidents, vehicle mileage, vehicle status; any period; download as Excel or PDF
+- **Settings** (superuser): depots. **Audit log** (fleet admins and superuser): searchable by period, vehicle and driver
+- **Documents:** upload from files, a folder, the phone camera, a webcam, or drag and drop
 
 ## Files
 
 - `index.html`: the page. `config.js`: Supabase URL, public key and the sign-in screen branding.
-- `main.js`, `api.js`, `ui.js`, `actions.js`, `docs.js`, `auth.js`, `shell.js`, `router.js`, `state.js`, `domain.js`: the app.
-- `tasks.js`, `vehicles.js`, `drivers.js`, `incidents.js`, `insurance.js`, `settings.js`, `audit.js`, `history.js`, `placeholder.js`: one file per screen.
+- `main.js`, `api.js`, `ui.js`, `actions.js`, `docs.js`, `exports.js`, `auth.js`, `shell.js`, `router.js`, `state.js`, `domain.js`: the app. `exports.js` builds the Excel and PDF files with no outside library.
+- `dashboard.js`, `reports.js`, `insight.js`, `tasks.js`, `vehicles.js`, `availability.js`, `garages.js`, `drivers.js`, `incidents.js`, `insurance.js`, `settings.js`, `audit.js`, `history.js`, `placeholder.js`: one file per screen or shared screen logic.
 - `theme.css`, `app.css`: styles. `supabase.js`: the Supabase client library (version 2.117.2). `*.woff2`: fonts (Cascadia Code and Barlow Condensed, both open licence).
 
 ## Branding

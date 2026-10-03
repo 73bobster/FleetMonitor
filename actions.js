@@ -2,6 +2,7 @@
 // tell the insurer, record a fine as paid, and so on. Shared by Tasks and the vehicle and driver pages.
 import * as api from './api.js';
 import { state, can } from './state.js';
+import { bookGarageModal, backInServiceModal, sornDeclaredModal, extendReturnModal, convertToOffRoadModal } from './availability.js';
 import {
   html, mount, on, openModal, closeModal, fieldsHtml, readForm, toast, pill, plate, formatReg,
   fmtDate, fmtDateShort, fmtDateTime, dueText, todayStr, addDaysISO,
@@ -36,6 +37,14 @@ export function taskButtons(t) {
       out.push({ action: 'nominated', label: 'Record driver named', primary: true }, { href: `#/incidents/${t.source_id}`, label: 'Open fine' }); break;
     case 'LEASE_END':
       out.push({ action: 'extend', label: 'Extend the term', primary: true }, { href: `#/vehicles/${t.source_id}?dispose=1`, label: 'Dispose of the vehicle' }, { href: `#/vehicles/${t.source_id}`, label: 'Open vehicle' }); break;
+    case 'SERVICE_BOOKING':
+      out.push({ action: 'book-garage', label: 'Book the garage', primary: true }, { href: `#/vehicles/${t.vehicle_id}?tab=availability`, label: 'Open vehicle' }); break;
+    case 'VEHICLE_SORN':
+      out.push({ action: 'sorn', label: 'Record SORN declared', primary: true }, { action: 'back-in-service', label: 'Back in service' }, { href: `#/vehicles/${t.vehicle_id}?tab=availability`, label: 'Open vehicle' }); break;
+    case 'VEHICLE_RETURN_OVERDUE':
+      out.push({ action: 'back-in-service', label: 'Back in service', primary: true }, { action: 'extend-return', label: 'Change expected return' }, { href: `#/vehicles/${t.vehicle_id}?tab=availability`, label: 'Open vehicle' }); break;
+    case 'VEHICLE_LONG_ABSENCE':
+      out.push({ action: 'convert-sorn', label: 'Record as off the road (SORN)', primary: true }, { action: 'back-in-service', label: 'Back in service' }, { href: `#/vehicles/${t.vehicle_id}?tab=availability`, label: 'Open vehicle' }); break;
     case 'VEHICLE_UNINSURED': out.push({ href: `#/vehicles/${t.source_id}?tab=insurance`, label: 'Add to a policy', primary: true }); break;
     case 'VEHICLE_DISPOSAL_INSURER':
       out.push({ action: 'notify-vehicle', label: 'Record insurer told', primary: true }, { href: `#/vehicles/${t.source_id}`, label: 'Open vehicle' }); break;
@@ -63,6 +72,11 @@ export function runAction(action, t, ctx, onChange) {
     paid: () => paidModal(t, ctx, onChange),
     nominated: () => nominatedModal(t, ctx, onChange),
     extend: () => extendModal(t, ctx, onChange),
+    'book-garage': async () => { const item = await api.getVehicleItem(t.vehicle_id, 'SERVICE'); closeModal(); await bookGarageModal(t.vehicle_id, item?.due_date, onChange); },
+    sorn: () => { closeModal(); sornDeclaredModal(t.source_id, { onDone: onChange }); },
+    'back-in-service': () => { closeModal(); return backInServiceModal(t.source_id, { onDone: onChange }); },
+    'extend-return': () => { closeModal(); return extendReturnModal(t.source_id, { onDone: onChange }); },
+    'convert-sorn': () => { closeModal(); return convertToOffRoadModal(t.source_id, { onDone: onChange }); },
   };
   return map[action]?.();
 }

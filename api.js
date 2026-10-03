@@ -25,6 +25,16 @@ export function friendly(err) {
 }
 const fail = (error) => { const e = new Error(friendly(error)); e.code = error.code; e.raw = error; throw e; };
 const ok = ({ data, error }) => { if (error) fail(error); return data; };
+// The API returns at most 1,000 rows per request, so long lists are read a page at a time.
+// build() must return a fresh query with a stable order.
+async function all(build) {
+  const out = [];
+  for (let from = 0; ; from += 1000) {
+    const rows = ok(await build().range(from, from + 999));
+    out.push(...rows);
+    if (rows.length < 1000) return out;
+  }
+}
 
 // ---- Authentication -----------------------------------------------------
 function authFail(error) {
@@ -69,7 +79,7 @@ export function logoUrl(brand) {
 
 // ---- Tasks and compliance ------------------------------------------------
 export const listTasks = async () =>
-  ok(await sb.from('compliance_tasks').select('*').eq('organisation_id', org()).order('due_date', { ascending: true, nullsFirst: false }));
+  all(() => sb.from('compliance_tasks').select('*').eq('organisation_id', org()).order('due_date', { ascending: true, nullsFirst: false }).order('source_id').order('state_key'));
 export const listComplianceTypes = async () =>
   ok(await sb.from('compliance_types').select('*').eq('organisation_id', org()).order('sort_order'));
 
@@ -181,10 +191,12 @@ export const updateConviction = (id, patch) => saveConviction(patch, id);
 
 // ---- Incidents (accidents, damage and fines) --------------------------------------
 export async function listIncidents({ vehicleId, driverId } = {}) {
-  let q = sb.from('incidents').select('*').eq('organisation_id', org()).is('archived_at', null);
-  if (vehicleId) q = q.eq('vehicle_id', vehicleId);
-  if (driverId) q = q.eq('driver_id', driverId);
-  return ok(await q.order('incident_date', { ascending: false }));
+  return all(() => {
+    let q = sb.from('incidents').select('*').eq('organisation_id', org()).is('archived_at', null);
+    if (vehicleId) q = q.eq('vehicle_id', vehicleId);
+    if (driverId) q = q.eq('driver_id', driverId);
+    return q.order('incident_date', { ascending: false }).order('id');
+  });
 }
 export const getIncident = async (id) =>
   ok(await sb.from('incidents').select('*').eq('organisation_id', org()).eq('id', id).maybeSingle());
@@ -227,10 +239,12 @@ export const saveContact = async (values) =>
 
 // ---- Assignments, readings and costs -------------------------------------------------
 export async function listAssignments({ vehicleId, driverId }) {
-  let q = sb.from('vehicle_assignments').select('*').eq('organisation_id', org());
-  if (vehicleId) q = q.eq('vehicle_id', vehicleId);
-  if (driverId) q = q.eq('driver_id', driverId);
-  return ok(await q.order('start_date', { ascending: false }));
+  return all(() => {
+    let q = sb.from('vehicle_assignments').select('*').eq('organisation_id', org());
+    if (vehicleId) q = q.eq('vehicle_id', vehicleId);
+    if (driverId) q = q.eq('driver_id', driverId);
+    return q.order('start_date', { ascending: false }).order('id');
+  });
 }
 export const addAssignment = async (values) =>
   ok(await sb.from('vehicle_assignments').insert({ ...values, organisation_id: org() }).select().single());
@@ -299,3 +313,44 @@ export async function searchAudit({ from, to, vehicleId, driverId, includeReadin
   if (!includeReadings) q = q.neq('table_name', 'odometer_readings');
   return ok(await q.order('occurred_at', { ascending: false }).limit(limit));
 }
+
+// ---- Garages and vehicle availability ---------------------------------------------------
+export const listGarages = async () =>
+  ok(await sb.from('garages').select('*').eq('organisation_id', org()).order('name'));
+export async function saveGarage(values, id) {
+  if (id) return ok(await sb.from('garages').update(values).eq('id', id).eq('organisation_id', org()).select().single());
+  return ok(await sb.from('garages').insert({ ...values, organisation_id: org() }).select().single());
+}
+export const listUnavailability = async (vehicleId) =>
+  all(() => {
+    let q = sb.from('vehicle_unavailability').select('*').eq('organisation_id', org());
+    if (vehicleId) q = q.eq('vehicle_id', vehicleId);
+    return q.order('from_date', { ascending: false }).order('id');
+  });
+export const outOfService = async (a) =>
+  ok(await sb.rpc('vehicle_out_of_service', {
+    p_vehicle_id: a.vehicleId, p_reason: a.reason, p_garage_id: a.garageId ?? null, p_from: a.from, p_expected_return: a.expectedReturn ?? null,
+    p_incident_id: a.incidentId ?? null, p_location_note: a.locationNote ?? null, p_notes: a.notes ?? null, p_sorn_declared_on: a.sornDeclaredOn ?? null,
+  }));
+export const backInService = async ({ eventId, returnedOn, notes }) =>
+  ok(await sb.rpc('vehicle_back_in_service', { p_event_id: eventId, p_returned_on: returnedOn, p_notes: notes ?? null }));
+export const convertToOffRoad = async ({ eventId, sornDeclaredOn }) =>
+  ok(await sb.rpc('vehicle_convert_to_off_road', { p_event_id: eventId, p_sorn_declared_on: sornDeclaredOn }));
+export const updateUnavailability = async (id, patch) =>
+  ok(await sb.from('vehicle_unavailability').update(patch).eq('id', id).eq('organisation_id', org()).select().single());
+// The compliance item (for example the SERVICE or MOT item) on a vehicle, by type code.
+export async function getVehicleItem(vehicleId, code) {
+  const types = ok(await sb.from('compliance_types').select('id').eq('organisation_id', org()).eq('code', code));
+  if (!types.length) return null;
+  return ok(await sb.from('compliance_items').select('*').eq('organisation_id', org()).eq('vehicle_id', vehicleId).eq('compliance_type_id', types[0].id).maybeSingle());
+}
+
+// ---- Fleet-wide data for the dashboard and reports ---------------------------------------
+// Running costs dated inside a period.
+export const listCostsBetween = async ({ from, to }) =>
+  all(() => sb.from('vehicle_costs').select('*').eq('organisation_id', org()).gte('cost_date', from).lte('cost_date', to).order('cost_date', { ascending: false }).order('id'));
+// Odometer readings at the start and end of a period for each vehicle, worked out in the database.
+export const milesInPeriod = async ({ from, to }) =>
+  ok(await sb.rpc('mileage_in_period', { p_org: org(), p_from: from, p_to: to }));
+export const cancelBooking = async ({ eventId, notes }) =>
+  ok(await sb.rpc('vehicle_cancel_booking', { p_event_id: eventId, p_notes: notes ?? null }));
