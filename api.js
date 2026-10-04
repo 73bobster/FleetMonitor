@@ -12,6 +12,7 @@ const org = () => state.org.id;
 export function friendly(err) {
   const msg = err?.message || String(err);
   if (/row-level security|permission denied/i.test(msg)) return "You don't have permission to do that.";
+  if (/at least one active superuser/i.test(msg)) return 'There must always be at least one active superuser. Make someone else a superuser first.';
   if (err?.code === '23505') {
     if (/registration/i.test(msg)) return 'A vehicle with that registration already exists.';
     if (/employee_number/i.test(msg)) return 'A current driver with that employee number already exists.';
@@ -130,6 +131,10 @@ export async function listMembers() {
   const byId = new Map(profiles.map((p) => [p.id, p]));
   return members.map((m) => ({ ...m, email: byId.get(m.user_id)?.email || '', display_name: byId.get(m.user_id)?.display_name || '' }));
 }
+// Change someone's user type, or their status: active, disabled (suspended) or removed (left, kept for the audit trail).
+// Nobody is deleted. The database refuses to leave an organisation without an active superuser.
+export const updateMember = async (id, patch) =>
+  ok(await sb.from('memberships').update(patch).eq('id', id).eq('organisation_id', org()).select().single());
 // Invitations still waiting: not accepted and not revoked (they may have expired).
 export const listInvitations = async () =>
   ok(await sb.from('invitations').select('*').eq('organisation_id', org()).is('accepted_at', null).is('revoked_at', null).order('created_at', { ascending: false }));

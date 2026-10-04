@@ -494,8 +494,9 @@ table.planner { width: 100%; border-collapse: separate; border-spacing: 0; font-
 
 /* ---- Vehicle type icon beside the number plate ---- */
 .veh { display: inline-flex; align-items: center; gap: .35em; vertical-align: middle; white-space: nowrap; }
-.veh-ico { width: 20px; height: 20px; flex: none; fill: none; stroke: var(--ink-3); stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
-.head-vehicle h1 .veh-ico { width: 34px; height: 34px; stroke-width: 1.3; }
+.veh-ico { width: 24px; height: 24px; flex: none; fill: #7A7A7A; stroke: none; }
+.veh-ico.veh-hgv { fill: #1F4F9C; }   /* lorries are blue, so they are never mistaken for a van */
+.head-vehicle h1 .veh-ico { width: 40px; height: 40px; }
 
 /* ---- Vehicles list: availability ---- */
 .avail { display: inline-block; padding: 1px 10px; font-size: .75rem; font-weight: 700; border-radius: 99px; white-space: nowrap; }
@@ -513,3 +514,21 @@ table.planner { width: 100%; border-collapse: separate; border-spacing: 0; font-
 .role-hints dd { margin: 0; color: var(--ink-2); }
 .invite-actions { display: flex; flex-wrap: wrap; gap: 10px; margin: 14px 0 0; }
 .nw { white-space: nowrap; }
+
+/* ---- Settings: users and access ---- */
+.grid tr.row-off td { background: #FAFAFA; }
+.grid tr.row-off td strong { font-weight: 400; color: var(--ink-2); }
+.access-summary { margin-top: 18px; }
+.access-summary summary { cursor: pointer; font-weight: 700; font-size: .875rem; padding: 4px 0; }
+.access-summary .scroll { margin-top: 8px; }
+.access-table th:not(:first-child), .access-table td:not(:first-child) { text-align: center; white-space: nowrap; }
+.lvl { display: inline-block; min-width: 44px; padding: 1px 8px; font-size: .75rem; font-weight: 700; border-radius: 3px; text-align: center; }
+.lvl-full { color: var(--ok); background: var(--ok-bg); }
+.lvl-view { color: var(--info); background: var(--info-bg); }
+.lvl-none { color: var(--ink-3); background: var(--quiet-bg); font-weight: 400; }
+
+/* ---- Audit log links ---- */
+a.tag-link { text-decoration: none; color: var(--ink); }
+a.tag-link:hover { text-decoration: underline; }
+.history-link { margin-left: 6px; font-size: .75rem; white-space: nowrap; }
+.access-table th:first-child, .access-table td:first-child { min-width: 210px; overflow-wrap: normal; }

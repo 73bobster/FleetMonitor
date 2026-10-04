@@ -8,14 +8,14 @@ import { auditLookups, historyList } from './history.js';
 export async function auditView(main) {
   if (!can.audit) { mount(main, html`<header class="page-head"><h1>Audit log</h1></header>${emptyHtml("You don't have access to the audit log", 'Ask an admin or the superuser.')}`); return; }
   mount(main, html`<header class="page-head"><h1>Audit log</h1></header>${loadingHtml()}`);
-  const L = await auditLookups();
+  const L = await auditLookups({ users: true });
   const vehicles = [...L.vehicles.values()].sort((a, b) => a.registration.localeCompare(b.registration));
   const drivers = [...L.drivers.values()];
   const ui = { from: addDaysISO(todayStr(), -30), to: todayStr(), vehicleId: '', driverId: '', readings: false, limit: 200 };
 
   mount(main, html`
     <header class="page-head"><h1>Audit log</h1></header>
-    <p class="muted">Every change made in FleetMonitor: who made it, when, and what it was. It cannot be edited or deleted.</p>
+    <p class="muted">Every change made in FleetMonitor: who made it, when, and what it was. It cannot be edited or deleted. Click a number plate, a driver or an "Open" link to go to the record.</p>
     <form class="filters audit-filters" id="audit-form">
       <div class="field"><label for="a-from">From</label><input type="date" id="a-from" value="${ui.from}"></div>
       <div class="field"><label for="a-to">To</label><input type="date" id="a-to" value="${ui.to}"></div>

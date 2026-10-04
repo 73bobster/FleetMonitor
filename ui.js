@@ -124,19 +124,22 @@ export function formatReg(reg) {
   const m = /^([A-Z]{2}\d{2})([A-Z]{3})$/.exec(r);
   return m ? `${m[1]} ${m[2]}` : String(reg || '').toUpperCase().trim();
 }
-// A small outline of the kind of vehicle, shown beside the plate wherever the vehicle type is known.
-const VEH_WHEELS = '<circle cx="7" cy="16.5" r="2.3"/><circle cx="17" cy="16.5" r="2.3"/>';
+// A small solid shape of the kind of vehicle, shown beside the plate wherever the vehicle type is known.
+// Each is drawn to read at a glance: a van is one low body with a sloping nose, a lorry is a tall square box with a
+// separate cab (and is also a different colour), a car is low and rounded, a pick-up has an open back.
+const WHEEL = (x) => `<circle cx="${x}" cy="16.9" r="2.1"/>`;
+const ARCHES = 'H20.5A3 3 0 0 0 14.5 16.5H9.5A3 3 0 0 0 3.5 16.5H1.5Z';   // the underside, with two wheel arches
 const VEH_ICONS = {
-  car: `<path d="M2.5 16v-2.3c0-.6.4-1.1 1-1.2L6 11.5l2.2-3.6c.2-.3.5-.4.8-.4h6c.3 0 .6.1.8.4l2.2 3.6 2.5 1c.6.1 1 .6 1 1.2V16h-2.2M2.5 16h2.2M9.3 16h5.4M6.5 11.5h11"/>${VEH_WHEELS}`,
-  van: `<path d="M2 16V8.5C2 7.7 2.7 7 3.5 7H14l4.5 4 2.7.9c.5.2.8.6.8 1.1V16h-2.7M2 16h2.7M9.3 16h5.4M14 7v4h4.5"/>${VEH_WHEELS}`,
-  light_goods: `<path d="M2 16v-4.5h9.5V8h4.3l3 3.5 2.2.7c.6.2 1 .7 1 1.3V16h-2.7M2 16h2.7M9.3 16h5.4M11.5 11.5h7.3"/>${VEH_WHEELS}`,
-  hgv: `<path d="M1.5 16V5.5h12V16M13.5 9H18l3.5 3.5V16h-2.2M1.5 16h2.2M8.3 16h6.4M17 9v3.5h4.5"/><circle cx="6" cy="16.5" r="2.3"/><circle cx="17" cy="16.5" r="2.3"/>`,
-  bus: `<path d="M2 16V7.5C2 6.7 2.7 6 3.5 6h17c.8 0 1.5.7 1.5 1.5V16h-2.7M2 16h2.7M9.3 16h5.4M2 11h20M8 6v5M14 6v5"/>${VEH_WHEELS}`,
-  trailer: `<path d="M6 15.5V6h15.5v9.5h-4.2M6 15.5h6.7M6 13.5H2M4 13.5V18"/><circle cx="15" cy="16.5" r="2.3"/>`,
-  plant: `<path d="M4 12V6.5h6l1.5 4.5H17l3 1.5V15M4 6.5V5M11.5 11H4"/><circle cx="7" cy="15.5" r="3.5"/><circle cx="18.5" cy="17" r="2"/>`,
+  car: `<path fill-rule="evenodd" d="M1.5 13.4c0-.8.5-1.4 1.3-1.6L6 11.2 8.3 8.1c.3-.4.8-.6 1.3-.6h5c.5 0 1 .2 1.3.6l2.5 3.1 2.7.6c.8.2 1.4.9 1.4 1.7v3${ARCHES}M8.2 11h3.3V8.9H9.9zM12.7 11h3.9l-1.7-2.1h-2.2z"/>${WHEEL(6.5)}${WHEEL(17.5)}`,
+  van: `<path fill-rule="evenodd" d="M1.5 8.5C1.5 7.7 2.2 7 3 7h10.4c.4 0 .8.2 1.1.4L18.3 11l2.9.9c.8.2 1.3.9 1.3 1.7v2.9${ARCHES}M14 8.6V11h3.1z"/>${WHEEL(6.5)}${WHEEL(17.5)}`,
+  light_goods: `<path fill-rule="evenodd" d="M1.5 11.6h9.3V8.3c0-.5.4-.8.8-.8h4c.5 0 .9.2 1.2.6l2.2 3 2.2.7c.8.2 1.3.9 1.3 1.7v3${ARCHES}M12.6 9v2.2h4.3L15.3 9z"/>${WHEEL(6.5)}${WHEEL(17.5)}`,
+  hgv: `<path d="M1 4.2h13v12.3H8.5A3 3 0 0 0 2.5 16.5H1z"/><path fill-rule="evenodd" d="M15 7.8h3.3c.5 0 .9.2 1.2.6l3 3.7v4.4h-1A3 3 0 0 0 15.5 16.5H15zM16.6 9.4v2.6h4.3l-2.1-2.6z"/>${WHEEL(5.5)}${WHEEL(18.5)}`,
+  bus: `<path fill-rule="evenodd" d="M1.5 7C1.5 6.2 2.2 5.5 3 5.5h18c.8 0 1.5.7 1.5 1.5v9.5${ARCHES}M3.6 7.6v3.2h3.3V7.6zM8.3 7.6v3.2h3.3V7.6zM13 7.6v3.2h3.3V7.6zM17.7 7.6v3.2h3.3V7.6z"/>${WHEEL(6.5)}${WHEEL(17.5)}`,
+  trailer: `<path d="M5.5 5h17v11.5h-5a3 3 0 0 0-6 0h-6zM1 12.6h4.5v1.8H1z"/>${WHEEL(14.5)}`,
+  plant: `<path fill-rule="evenodd" d="M4.5 4.5H11l1.3 5H19a2 2 0 0 1 2 2v3h-9.3a4.6 4.6 0 0 0-7.2-3.3zM6.2 6.2v3.3h4.4l-.9-3.3z"/><path fill-rule="evenodd" d="M7.5 11.5a4 4 0 1 0 0 8 4 4 0 0 0 0-8zm0 2.5a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3z"/><circle cx="18.5" cy="17.2" r="2.3"/>`,
 };
 VEH_ICONS.other = VEH_ICONS.van;
-export const vehIcon = (category) => (VEH_ICONS[category] ? raw(`<svg class="veh-ico" viewBox="0 0 24 24" role="img" aria-label="${esc(CATEGORY_LABEL[category])}"><title>${esc(CATEGORY_LABEL[category])}</title>${VEH_ICONS[category]}</svg>`) : '');
+export const vehIcon = (category) => (VEH_ICONS[category] ? raw(`<svg class="veh-ico veh-${category}" viewBox="0 0 24 24" role="img" aria-label="${esc(CATEGORY_LABEL[category])}"><title>${esc(CATEGORY_LABEL[category])}</title>${VEH_ICONS[category]}</svg>`) : '');
 // plate(registration) draws the plate; plate(registration, category) adds the vehicle-type icon in front of it.
 export const plate = (reg, category) => {
   const p = html`<span class="plate" role="img" aria-label="Registration ${formatReg(reg)}">${formatReg(reg)}</span>`;

@@ -1,5 +1,6 @@
 // Turns audit-log entries into plain sentences. Used by the History tabs and the Audit log screen.
 import * as api from './api.js';
+import { ROLE_LABEL, MEMBER_STATUS_LABEL } from './state.js';
 import { html, plate, fmtDateTime, fmtDateShort, fmtMoney } from './ui.js';
 import { driverName, CATEGORY_NOUN, INCIDENT_KIND_LABEL, FINE_TYPE_LABEL, LEAVING_REASON_LABEL, DISPOSAL_REASON_LABEL, LICENCE_STATUS_LABEL } from './domain.js';
 
@@ -7,15 +8,30 @@ export const TABLE_LABEL = {
   vehicles: 'Vehicle', drivers: 'Driver', driver_sensitive: 'Driver licence details', licence_checks: 'Licence check', vehicle_assignments: 'Driver assignment',
   compliance_items: 'Compliance item', compliance_renewals: 'Renewal', compliance_types: 'Compliance type', task_states: 'Task', insurance_policies: 'Insurance policy',
   policy_vehicles: 'Insurance cover', insurance_claims: 'Claim', incidents: 'Incident', driver_convictions: 'Conviction', driver_periods: 'Employment', documents: 'Document',
-  vehicle_costs: 'Cost', depots: 'Depot', vehicle_requirements: 'Vehicles needed', contacts: 'Contact', organisations: 'Organisation settings', memberships: 'User access', invitations: 'Invitation',
+  vehicle_costs: 'Cost', garages: 'Garage', vehicle_unavailability: 'Garage visit or time off the road', depots: 'Depot', vehicle_requirements: 'Vehicles needed', contacts: 'Contact', organisations: 'Organisation settings', memberships: 'User access', invitations: 'Invitation',
   support_grants: 'Support access', message_templates: 'Message template', odometer_readings: 'Mileage reading', external_links: 'External link', integration_connections: 'Integration',
 };
 const FIELD = { mobile_work: 'work mobile', mobile_personal: 'personal mobile', company_phone: 'company phone', gross_weight_kg: 'gross weight', payload_kg: 'payload', licence_number: 'licence number', date_of_birth: 'date of birth' };
 
-export async function auditLookups() {
-  const [vehicles, drivers, types, depots] = await Promise.all([api.listVehicles(), api.listDrivers(), api.listComplianceTypes(), api.listAllDepots()]);
-  return { vehicles: new Map(vehicles.map((v) => [v.id, v])), drivers: new Map(drivers.map((d) => [d.id, d])), types: new Map(types.map((t) => [t.id, t])), depots: new Map(depots.map((d) => [d.id, d])) };
+// Names for the ids an audit entry holds. users is only wanted by the Audit log screen (to name whose access changed).
+export async function auditLookups({ users = false } = {}) {
+  const [vehicles, drivers, types, depots, members] = await Promise.all([api.listVehicles(), api.listDrivers(), api.listComplianceTypes(), api.listAllDepots(), users ? api.listMembers().catch(() => []) : []]);
+  return { vehicles: new Map(vehicles.map((v) => [v.id, v])), drivers: new Map(drivers.map((d) => [d.id, d])), types: new Map(types.map((t) => [t.id, t])), depots: new Map(depots.map((d) => [d.id, d])), users: new Map(members.map((m) => [m.user_id, m])) };
 }
+
+// Where an audit entry leads: the record it is about, when that record has a screen of its own. Vehicles and drivers
+// are linked from their plate and name instead. Building the link costs nothing: the ids are already in the entry.
+const SETTINGS_TABLES = ['depots', 'vehicle_requirements', 'organisations', 'memberships', 'invitations', 'compliance_types', 'message_templates'];
+export function recordLink(e) {
+  const row = e.new_data || e.old_data || {};
+  if (e.table_name === 'incidents') return [`#/incidents/${e.record_id}`, 'Open the incident'];
+  if (e.table_name === 'insurance_policies') return [`#/insurance/${e.record_id}`, 'Open the policy'];
+  if (['policy_vehicles', 'insurance_claims'].includes(e.table_name) && row.policy_id) return [`#/insurance/${row.policy_id}`, 'Open the policy'];
+  if (e.table_name === 'garages') return ['#/garages', 'Open garages'];
+  if (SETTINGS_TABLES.includes(e.table_name)) return ['#/settings', 'Open settings'];
+  return null;
+}
+const vehicleHref = (e) => `#/vehicles/${e.vehicle_id}${e.table_name === 'vehicle_unavailability' ? '?tab=availability' : ''}`;
 
 const ISO = /^\d{4}-\d{2}-\d{2}(T|$)/;
 function fmtVal(key, v, L) {
@@ -91,6 +107,25 @@ function describe(e, L) {
     case 'odometer_readings':
       if (e.action === 'INSERT') return html`logged a mileage reading of ${n.mileage}`;
       break;
+    case 'organisations':
+      if (changed(e, 'settings')) {
+        const was = o.settings || {}; const now = n.settings || {};
+        const keys = Object.keys(now).filter((k) => JSON.stringify(now[k]) !== JSON.stringify(was[k]));
+        return html`changed settings: ${keys.map((k) => `${k.replace(/_/g, ' ')} to ${now[k]}`).join(', ') || 'no visible change'}`;
+      }
+      break;
+    case 'memberships': {
+      const who = L.users?.get(row.user_id)?.email || 'a user';
+      if (e.action === 'INSERT') return html`gave ${who} access as ${ROLE_LABEL[n.role] || n.role}`;
+      if (changed(e, 'status')) return html`${n.status === 'disabled' ? 'suspended' : n.status === 'removed' ? 'removed' : o.status === 'removed' ? 'brought back' : 'reinstated'} ${who}${changed(e, 'role') ? html` as ${ROLE_LABEL[n.role] || n.role}` : ''}`;
+      if (changed(e, 'role')) return html`changed ${who} from ${ROLE_LABEL[o.role] || o.role} to ${ROLE_LABEL[n.role] || n.role}`;
+      break;
+    }
+    case 'invitations':
+      if (e.action === 'INSERT') return html`invited ${n.email} as ${ROLE_LABEL[n.role] || n.role}`;
+      if (changed(e, 'revoked_at') && n.revoked_at) return html`revoked the invitation for ${n.email}`;
+      if (changed(e, 'accepted_at') && n.accepted_at) return html`${n.email} accepted their invitation`;
+      break;
     case 'vehicle_requirements':
       if (e.action !== 'DELETE') return html`${e.action === 'INSERT' ? 'set' : 'changed'} the number of ${CATEGORY_NOUN[row.category]?.[1] || 'vehicles'} needed`;
       break;
@@ -103,12 +138,12 @@ function describe(e, L) {
 }
 
 // Detail chips for a plain update that has no special sentence.
-const needsChips = (e) => e.action === 'UPDATE' && !((e.table_name === 'compliance_items' && changed(e, 'due_date')) || (e.table_name === 'vehicles' && (changed(e, 'archived_at') || (changed(e, 'status') && e.new_data?.status === 'disposed'))) || e.table_name === 'task_states' || (e.table_name === 'incidents' && (changed(e, 'insurer_notified_on') || changed(e, 'paid_on') || changed(e, 'nominated_on'))) || (e.table_name === 'driver_convictions' && (changed(e, 'insurer_notified_on') || changed(e, 'status'))) || (e.table_name === 'driver_periods' && changed(e, 'end_date')) || (e.table_name === 'policy_vehicles' && changed(e, 'end_date')) || (e.table_name === 'vehicle_assignments' && changed(e, 'end_date')) || (e.table_name === 'documents' && changed(e, 'archived_at')));
+const needsChips = (e) => e.action === 'UPDATE' && !(['memberships', 'invitations'].includes(e.table_name) || (e.table_name === 'organisations' && changed(e, 'settings')) || (e.table_name === 'compliance_items' && changed(e, 'due_date')) || (e.table_name === 'vehicles' && (changed(e, 'archived_at') || (changed(e, 'status') && e.new_data?.status === 'disposed'))) || e.table_name === 'task_states' || (e.table_name === 'incidents' && (changed(e, 'insurer_notified_on') || changed(e, 'paid_on') || changed(e, 'nominated_on'))) || (e.table_name === 'driver_convictions' && (changed(e, 'insurer_notified_on') || changed(e, 'status'))) || (e.table_name === 'driver_periods' && changed(e, 'end_date')) || (e.table_name === 'policy_vehicles' && changed(e, 'end_date')) || (e.table_name === 'vehicle_assignments' && changed(e, 'end_date')) || (e.table_name === 'documents' && changed(e, 'archived_at')));
 
 export function historyList(entries, L, { subject = false } = {}) {
   if (!entries.length) return html`<p class="muted">No changes recorded for this selection.</p>`;
   return html`<ul class="history">${entries.map((e) => html`<li>
     <span class="muted">${fmtDateTime(e.occurred_at)}</span> <strong>${e.actor_label || 'System'}</strong>
-    ${subject ? html`<span class="subject">${e.vehicle_id && L.vehicles.get(e.vehicle_id) ? plate(L.vehicles.get(e.vehicle_id).registration, L.vehicles.get(e.vehicle_id).category) : ''}${e.driver_id && L.drivers.get(e.driver_id) ? html` <span class="tag">${driverName(L.drivers.get(e.driver_id))}</span>` : ''}</span>` : ''}
-    ${describe(e, L)}${needsChips(e) ? html`<div class="chips">${changes(e, L, ['archived_at'])}</div>` : ''}</li>`)}</ul>`;
+    ${subject ? html`<span class="subject">${e.vehicle_id && L.vehicles.get(e.vehicle_id) ? html`<a class="plate-link" href="${vehicleHref(e)}">${plate(L.vehicles.get(e.vehicle_id).registration, L.vehicles.get(e.vehicle_id).category)}</a>` : ''}${e.driver_id && L.drivers.get(e.driver_id) ? html` <a class="tag tag-link" href="#/drivers/${e.driver_id}">${driverName(L.drivers.get(e.driver_id))}</a>` : ''}</span>` : ''}
+    ${describe(e, L)}${recordLink(e) ? html` <a class="history-link" href="${recordLink(e)[0]}">${recordLink(e)[1]}</a>` : ''}${needsChips(e) ? html`<div class="chips">${changes(e, L, ['archived_at'])}</div>` : ''}</li>`)}</ul>`;
 }
