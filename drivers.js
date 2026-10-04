@@ -60,7 +60,7 @@ export async function driversList(main) {
       return html`<tr>
         <td data-label="Driver"><a href="#/drivers/${d.id}"><strong>${driverName(d)}</strong></a><div class="sub">${d.job_title || ''}${former ? html` <span class="tag">Left ${fmtDateShort(d.end_date)}</span>` : ''}</div></td>
         <td data-label="Depot">${depotById.get(d.depot_id)?.name || ''}</td>
-        <td data-label="Vehicle">${mine.length ? mine.map((v) => html`<a class="plate-link" href="#/vehicles/${v.id}">${plate(v.registration)}</a> `) : html`<span class="muted">None</span>`}</td>
+        <td data-label="Vehicle">${mine.length ? mine.map((v) => html`<a class="plate-link" href="#/vehicles/${v.id}">${plate(v.registration, v.category)}</a> `) : html`<span class="muted">None</span>`}</td>
         <td data-label="Work mobile">${d.mobile_work || ''}${d.company_phone ? html`<div class="sub">Company phone</div>` : ''}</td>
         ${can.sensitive ? html`<td data-label="Licence">${lic ? html`${licencePill(lic.status)}<div class="sub">${pts} points${pts >= 9 ? html` <span class="c-overdue"><strong>check totting up</strong></span>` : ''}</div>` : html`<span class="muted">Not checked</span>`}</td>` : ''}
         <td data-label="Compliance">${!former && worst ? pill(worst) : html`<span class="muted">${former ? '' : 'None tracked'}</span>`}</td></tr>`;
@@ -93,7 +93,7 @@ export async function driverForm(main, { id }) {
     { name: 'notes', label: 'Notes', type: 'textarea', span: 2 },
   ];
   const sensitive = [
-    { name: 'licence_number', label: 'Licence number', autocomplete: 'off', hint: 'Used to recognise a returning driver and for DVLA checks. Only fleet managers, fleet admins and superusers can see it, and it is never written into the audit log.' },
+    { name: 'licence_number', label: 'Licence number', autocomplete: 'off', hint: 'Used to recognise a returning driver and for DVLA checks. Only fleet managers, admins and superusers can see it, and it is never written into the audit log.' },
     { name: 'date_of_birth', label: 'Date of birth', type: 'date', hint: 'Needed for insurance.' },
     { name: 'licence_start_date', label: 'Licence held since', type: 'date' },
     { name: 'licence_type', label: 'Licence type', type: 'select', options: [['full', 'Full'], ['provisional', 'Provisional'], ['international', 'International'], ['other', 'Other']] },
@@ -206,7 +206,7 @@ const TAB_RENDER = {
         ['Employment', open ? `Current, since ${fmtDateShort(open.start_date)}` : `Left ${fmtDateShort(d.end_date)}`]])}</section>
       <section><h2>Vehicles</h2>${assigns.length ? html`<ul class="plain">${assigns.map((a) => {
         const v = vById.get(a.vehicle_id);
-        return html`<li>${v ? html`<a class="plate-link" href="#/vehicles/${v.id}">${plate(v.registration)}</a> <span class="muted">${vehicleTitle(v)}</span>` : 'Former vehicle'}
+        return html`<li>${v ? html`<a class="plate-link" href="#/vehicles/${v.id}">${plate(v.registration, v.category)}</a> <span class="muted">${vehicleTitle(v)}</span>` : 'Former vehicle'}
           <div class="sub">${a.assignment_type === 'primary' ? 'Primary driver' : 'Named driver'}, ${fmtDateShort(a.start_date)} to ${a.end_date ? fmtDateShort(a.end_date) : 'now'}</div></li>`;
       })}</ul>` : html`<p class="muted">Not assigned to a vehicle. Assign them from a vehicle's Drivers tab.</p>`}</section>
       ${d.notes ? html`<section class="span-all"><h2>Notes</h2><p class="prewrap">${d.notes}</p></section>` : ''}

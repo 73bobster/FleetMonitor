@@ -26,7 +26,7 @@ export async function insuranceList(main) {
   mount(main, html`
     <header class="page-head"><h1>Insurance</h1>${can.write ? html`<a class="btn btn-primary" href="#/insurance/new">Add policy</a>` : ''}</header>
     ${uncovered.length ? html`<div class="banner-warn"><strong>${plural(uncovered.length, 'vehicle')} with no current cover:</strong>
-      ${uncovered.map((v) => html` <a class="plate-link" href="#/vehicles/${v.id}?tab=insurance">${plate(v.registration)}</a>`)}</div>` : html`<p class="banner-info">Every active vehicle has current insurance cover.</p>`}
+      ${uncovered.map((v) => html` <a class="plate-link" href="#/vehicles/${v.id}?tab=insurance">${plate(v.registration, v.category)}</a>`)}</div>` : html`<p class="banner-info">Every active vehicle has current insurance cover.</p>`}
     <div class="filters"><label class="check small"><input type="checkbox" id="p-all"> <span>Include expired and cancelled policies</span></label></div>
     <div id="p-table"></div>`);
   const box = main.querySelector('#p-table');
@@ -141,7 +141,7 @@ const TAB_RENDER = {
     const onPolicy = new Set(rows.filter((r) => !r.end_date || r.end_date >= today).map((r) => r.vehicle_id));
     mount(body, html`${can.write ? html`<p><button class="btn btn-primary" data-action="add">Add vehicles</button></p>` : ''}
       ${rows.length ? html`<table class="grid"><thead><tr><th>Vehicle</th><th>Cover from</th><th>Cover to</th><th></th></tr></thead><tbody>${rows.map((r) => { const v = vById.get(r.vehicle_id); const ended = r.end_date && r.end_date < today; return html`<tr>
-        <td data-label="Vehicle">${v ? html`<a class="plate-link" href="#/vehicles/${v.id}?tab=insurance">${plate(v.registration)}</a> <span class="sub">${vehicleTitle(v)}</span>` : 'Removed vehicle'}</td>
+        <td data-label="Vehicle">${v ? html`<a class="plate-link" href="#/vehicles/${v.id}?tab=insurance">${plate(v.registration, v.category)}</a> <span class="sub">${vehicleTitle(v)}</span>` : 'Removed vehicle'}</td>
         <td data-label="Cover from">${fmtDateShort(r.start_date || p.start_date)}</td>
         <td data-label="Cover to">${r.end_date ? fmtDateShort(r.end_date) : html`<span class="muted">Follows the policy (${fmtDateShort(p.end_date)})</span>`}</td>
         <td class="act">${can.write && !r.end_date ? html`<button class="btn btn-sm" data-action="end" data-id="${r.id}">End cover</button>` : ended ? html`<span class="tag">Ended</span>` : ''}</td></tr>`; })}</tbody></table>`
@@ -153,7 +153,7 @@ const TAB_RENDER = {
         openModal({
           title: 'Add vehicles to this policy', submitLabel: 'Add cover',
           body: html`${fieldsHtml(specs, { start_date: todayStr() })}
-            <fieldset class="pick"><legend>Vehicles</legend>${free.length ? free.map((v) => html`<label class="check"><input type="checkbox" name="veh" value="${v.id}"> <span>${plate(v.registration)} ${vehicleTitle(v)}${v.insured_until ? html` <span class="sub">(covered until ${fmtDateShort(v.insured_until)})</span>` : ''}</span></label>`) : html`<p class="muted">Every active vehicle is already on this policy.</p>`}</fieldset>`,
+            <fieldset class="pick"><legend>Vehicles</legend>${free.length ? free.map((v) => html`<label class="check"><input type="checkbox" name="veh" value="${v.id}"> <span>${plate(v.registration, v.category)} ${vehicleTitle(v)}${v.insured_until ? html` <span class="sub">(covered until ${fmtDateShort(v.insured_until)})</span>` : ''}</span></label>`) : html`<p class="muted">Every active vehicle is already on this policy.</p>`}</fieldset>`,
           onSubmit: async (f) => {
             const chosen = [...f.querySelectorAll('input[name="veh"]:checked')].map((i) => i.value);
             if (!chosen.length) throw new Error('Tick at least one vehicle.');
@@ -179,7 +179,7 @@ const TAB_RENDER = {
       ${claims.length ? html`<table class="grid"><thead><tr><th>Claim</th><th>Incident</th><th>Vehicle</th><th>Driver</th><th class="num">Claimed</th><th class="num">Paid</th><th>Status</th><th></th></tr></thead><tbody>${claims.map((c) => html`<tr>
         <td data-label="Claim"><strong>${c.claim_reference || 'No reference'}</strong><div class="sub">${c.description || ''}</div></td>
         <td data-label="Incident">${fmtDateShort(c.incident_date)}</td>
-        <td data-label="Vehicle">${vById.get(c.vehicle_id) ? plate(vById.get(c.vehicle_id).registration) : ''}</td>
+        <td data-label="Vehicle">${vById.get(c.vehicle_id) ? plate(vById.get(c.vehicle_id).registration, vById.get(c.vehicle_id).category) : ''}</td>
         <td data-label="Driver">${driverName(dById.get(c.driver_id))}</td>
         <td data-label="Claimed" class="num">${c.amount_claimed != null ? fmtMoney(c.amount_claimed) : ''}</td><td data-label="Paid" class="num">${c.amount_paid != null ? fmtMoney(c.amount_paid) : ''}</td>
         <td data-label="Status">${CLAIM_STATUS_LABEL[c.status]}</td>

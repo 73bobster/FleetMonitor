@@ -41,6 +41,19 @@ export async function vehiclesList(main) {
     <div id="v-table"></div>`);
   const box = main.querySelector('#v-table');
 
+  // Where the vehicle is right now: available, at a garage (which one, and when it is due back), or off the road.
+  const AVAIL_TONE = { available: 'ok', booked: 'ok', garage: 'out', sorn: 'bad', off_road_no_sorn: 'bad', disposed: 'quiet', archived: 'quiet' };
+  function availCell(v) {
+    const a = availability(v);
+    const late = v.unavailable_expected_return && v.unavailable_expected_return < todayStr();
+    const detail = a.key === 'garage' ? html`${UNAVAIL_REASON_LABEL[v.unavailable_reason]} at ${garageName(v.unavailable_garage_id)}${v.unavailable_expected_return ? html`, <span class="${late ? 'c-overdue' : ''}">${late ? 'was due back' : 'back'} ${fmtDateShort(v.unavailable_expected_return)}</span>` : ', no return date'}`
+      : a.key === 'booked' ? `Booked in ${fmtDateShort(v.next_booking_date)}`
+        : a.key === 'sorn' ? `Since ${fmtDateShort(v.unavailable_since)}`
+          : a.key === 'off_road_no_sorn' && v.unavailable_since ? `Since ${fmtDateShort(v.unavailable_since)}`
+            : a.key === 'disposed' && v.disposed_date ? fmtDateShort(v.disposed_date) : '';
+    return html`<div><span class="avail avail-${AVAIL_TONE[a.key] || 'quiet'}">${a.key === 'booked' ? 'Available' : a.label}</span>${detail ? html`<div class="sub">${detail}</div>` : ''}</div>`;
+  }
+
   function draw() {
     const rows = vehicles.filter((v) =>
       (ui.disposed || v.status !== 'disposed') && (ui.archived || !v.archived_at) &&
@@ -52,15 +65,16 @@ export async function vehiclesList(main) {
       return;
     }
     if (!rows.length) { mount(box, emptyHtml('No vehicles match', 'Try a different filter, or tick Include disposed or Include archived.')); return; }
-    mount(box, html`<table class="grid"><thead><tr><th>Vehicle</th><th>Depot</th><th>Driver</th><th>Insurance</th><th class="num">Mileage</th><th>Compliance</th></tr></thead><tbody>
+    mount(box, html`<table class="grid"><thead><tr><th>Vehicle</th><th>Availability</th><th>Depot</th><th>Driver</th><th>Insurance</th><th class="num">Mileage</th><th>Compliance</th></tr></thead><tbody>
       ${rows.map((v) => {
         const vt = tasks.filter((t) => t.vehicle_id === v.id && t.applies_to === 'vehicle');
         const worst = worstStatus(vt);
         const overdue = vt.filter((t) => t.status === 'overdue').length;
         const live = v.status === 'active' && !v.archived_at;
         return html`<tr>
-          <td data-label="Vehicle"><a class="plate-link" href="#/vehicles/${v.id}">${plate(v.registration)}</a>
-            <div class="sub">${vehicleTitle(v)}${v.nickname ? ` (${v.nickname})` : ''}${v.status === 'disposed' ? html` <span class="tag">Disposed</span>` : ''}${v.archived_at ? html` <span class="tag">Archived</span>` : ''}${!v.archived_at && v.status !== 'disposed' && !['available'].includes(availability(v).key) ? html` <span class="tag ${['garage', 'booked'].includes(availability(v).key) ? '' : 'tag-warn'}">${availability(v).label}</span>` : ''}</div>${v.unavailable_garage_id && v.unavailable_reason !== 'off_road' ? html`<div class="sub">${UNAVAIL_REASON_LABEL[v.unavailable_reason]} at ${garageName(v.unavailable_garage_id)}${v.unavailable_expected_return ? `, back ${fmtDateShort(v.unavailable_expected_return)}` : ''}</div>` : ''}</td>
+          <td data-label="Vehicle"><a class="plate-link" href="#/vehicles/${v.id}">${plate(v.registration, v.category)}</a>
+            <div class="sub">${vehicleTitle(v)}${v.nickname ? ` (${v.nickname})` : ''}</div></td>
+          <td data-label="Availability">${availCell(v)}</td>
           <td data-label="Depot">${depotById.get(v.depot_id)?.name || ''}</td>
           <td data-label="Driver">${v.primary_driver_id ? html`<a href="#/drivers/${v.primary_driver_id}">${driverName(driverById.get(v.primary_driver_id))}</a>` : html`<span class="muted">${live ? 'Unassigned' : ''}</span>`}</td>
           <td data-label="Insurance">${v.insured_until ? html`Until ${fmtDateShort(v.insured_until)}` : live ? html`<span class="c-overdue"><strong>No cover</strong></span>` : ''}</td>
@@ -197,7 +211,7 @@ export async function vehicleDetail(main, { id }, query) {
     : av.key === 'booked' ? html`<div class="banner-info"><p>Booked in on ${fmtDate(v.next_booking_date)}. See the Availability tab for the details.</p></div>` : '';
   mount(main, html`
     <header class="page-head head-vehicle">
-      <div><p class="crumb"><a href="#/vehicles">Vehicles</a></p><h1>${plate(v.registration)}</h1><p class="sub">${vehicleTitle(v)}${v.nickname ? ` (${v.nickname})` : ''}${v.status !== 'active' ? html` <span class="tag">${VEHICLE_STATUS_LABEL[v.status]}</span>` : ''}${v.archived_at ? html` <span class="tag">Archived</span>` : ''}</p></div>
+      <div><p class="crumb"><a href="#/vehicles">Vehicles</a></p><h1>${plate(v.registration, v.category)}</h1><p class="sub">${vehicleTitle(v)}${v.nickname ? ` (${v.nickname})` : ''}${v.status !== 'active' ? html` <span class="tag">${VEHICLE_STATUS_LABEL[v.status]}</span>` : ''}${v.archived_at ? html` <span class="tag">Archived</span>` : ''}</p></div>
       ${can.write ? html`<div class="head-actions"><a class="btn" href="#/vehicles/${v.id}/edit">Edit</a>${!disposed && !v.archived_at && ['available', 'booked'].includes(av.key) ? html`<button class="btn" data-action="out-of-service">Out of service</button>` : ''}${!disposed && !v.archived_at ? html`<button class="btn" data-action="dispose">Dispose</button>` : ''}${v.archived_at ? html`<button class="btn" data-action="restore">Restore</button>` : html`<button class="btn" data-action="archive">Archive</button>`}</div>` : ''}
     </header>
     ${disposed ? html`<p class="banner-info">Disposed of on ${fmtDate(v.disposed_date)} (${DISPOSAL_REASON_LABEL[v.disposal_reason] || v.disposal_reason}).${v.sold_to ? ` Sold to ${v.sold_to}${v.sale_price != null ? ` for ${fmtMoney(v.sale_price)}` : ''}.` : ''} Its records and history stay available.</p>` : ''}
@@ -296,7 +310,7 @@ const TAB_RENDER = {
           { name: 'driver_id', label: 'Driver', type: 'select', required: true, span: 2, options: drivers.filter((d) => d.employment_status === 'active').map((d) => [d.id, driverName(d)]) },
           { name: 'assignment_type', label: 'Role', type: 'select', required: true, options: [['primary', 'Primary driver'], ['named', 'Named driver']] },
           { name: 'start_date', label: 'From', type: 'date', required: true },
-          { name: 'override_reason', label: 'Override reason', type: 'textarea', span: 2, hint: can.override ? 'Only needed if the driver\'s licence is expired, suspended, revoked or disqualified.' : 'A fleet admin or superuser must approve assigning a driver whose licence is not valid.' },
+          { name: 'override_reason', label: 'Override reason', type: 'textarea', span: 2, hint: can.override ? 'Only needed if the driver\'s licence is expired, suspended, revoked or disqualified.' : 'An admin or superuser must approve assigning a driver whose licence is not valid.' },
         ];
         const dlg = openModal({
           title: 'Assign driver', submitLabel: 'Assign driver',
@@ -316,7 +330,7 @@ const TAB_RENDER = {
           const warn = dlg.querySelector('#licence-warn');
           const bad = lic && BLOCKING_LICENCE.includes(lic.status);
           warn.hidden = !bad;
-          if (bad) warn.textContent = `Latest licence check: ${LICENCE_STATUS_LABEL[lic.status]}. Assigning this driver needs an override reason from a fleet admin or superuser.`;
+          if (bad) warn.textContent = `Latest licence check: ${LICENCE_STATUS_LABEL[lic.status]}. Assigning this driver needs an override reason from an admin or superuser.`;
         });
       },
     });

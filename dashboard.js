@@ -124,14 +124,14 @@ export async function dashboardView(main) {
           </tbody></table>
           ${atGarage.length + offRoad.length ? html`<h3>Out of service now</h3><ul class="plain">${[...atGarage, ...offRoad].map(({ v }) => {
             const late = v.unavailable_expected_return && v.unavailable_expected_return < today;
-            return html`<li>${link(`#/vehicles/${v.id}?tab=availability`, plate(v.registration), 'plate-link')} <span class="muted">${UNAVAIL_REASON_LABEL[v.unavailable_reason]}${v.unavailable_reason === 'off_road' ? '' : ` at ${gById.get(v.unavailable_garage_id)?.name || 'a garage'}`}, since ${fmtDateShort(v.unavailable_since)}</span>
+            return html`<li>${link(`#/vehicles/${v.id}?tab=availability`, plate(v.registration, v.category), 'plate-link')} <span class="muted">${UNAVAIL_REASON_LABEL[v.unavailable_reason]}${v.unavailable_reason === 'off_road' ? '' : ` at ${gById.get(v.unavailable_garage_id)?.name || 'a garage'}`}, since ${fmtDateShort(v.unavailable_since)}</span>
               ${v.unavailable_expected_return ? html`<span class="${late ? 'c-overdue' : 'muted'}"> ${late ? html`<strong>Back was due</strong>` : 'Back'} ${fmtDateShort(v.unavailable_expected_return)}</span>` : ''}</li>`;
           })}</ul>` : ''}
-          ${booked.length ? html`<h3>Booked in</h3><ul class="plain">${booked.map((v) => html`<li>${link(`#/vehicles/${v.id}?tab=availability`, plate(v.registration), 'plate-link')} <span class="muted">${fmtDateShort(v.next_booking_date)}</span></li>`)}</ul>` : ''}
+          ${booked.length ? html`<h3>Booked in</h3><ul class="plain">${booked.map((v) => html`<li>${link(`#/vehicles/${v.id}?tab=availability`, plate(v.registration, v.category), 'plate-link')} <span class="muted">${fmtDateShort(v.next_booking_date)}</span></li>`)}</ul>` : ''}
         </section>
         <section class="dash-panel"><h2>Needs attention</h2>
           ${attention.length ? html`<ul class="attn">${attention.map((t) => html`<li><a href="#/tasks?category=${taskCategory(t)}&status=${t.status}">
-            <span class="attn-what">${t.vehicle_id && t.applies_to === 'vehicle' ? plate(vById.get(t.vehicle_id)?.registration || t.target_label.split(' - ')[0]) : html`<strong>${t.target_label}</strong>`}</span>
+            <span class="attn-what">${t.vehicle_id && t.applies_to === 'vehicle' ? plate(vById.get(t.vehicle_id)?.registration || t.target_label.split(' - ')[0], vById.get(t.vehicle_id)?.category) : html`<strong>${t.target_label}</strong>`}</span>
             <span class="attn-name">${t.type_name}</span><span class="attn-due">${pill(t.status)} <span class="muted">${dueText(t.days_remaining)}</span></span></a></li>`)}</ul>
             <p><a href="#/tasks">See all ${open.length} open tasks</a></p>` : html`<p class="muted">Nothing is overdue or due soon.</p>`}
         </section>
@@ -155,14 +155,14 @@ export async function dashboardView(main) {
             <tr><th>Fines</th><td class="num">${fmtMoney(fineTotal)}</td></tr>
             <tr class="total"><th>Cost to the company, before insurers</th><td class="num">${fmtMoney(incidentSpend)}</td></tr>
           </tbody></table>
-          ${inc.length ? html`<h3>Most recent</h3><ul class="plain">${inc.slice(0, 5).map((i) => html`<li>${link(`#/incidents/${i.id}`, `${fmtDateShort(i.incident_date)} ${incidentTitle(i)}`)} ${i.vehicle_id && vById.get(i.vehicle_id) ? plate(vById.get(i.vehicle_id).registration) : ''}
+          ${inc.length ? html`<h3>Most recent</h3><ul class="plain">${inc.slice(0, 5).map((i) => html`<li>${link(`#/incidents/${i.id}`, `${fmtDateShort(i.incident_date)} ${incidentTitle(i)}`)} ${i.vehicle_id && vById.get(i.vehicle_id) ? plate(vById.get(i.vehicle_id).registration, vById.get(i.vehicle_id).category) : ''}
             ${dById.get(i.driver_id) ? link(`#/drivers/${i.driver_id}`, driverName(dById.get(i.driver_id))) : html`<span class="muted">${i.driver_id ? 'Archived driver' : 'No driver recorded'}</span>`} <span class="muted">${incidentCost(i) ? fmtMoney(incidentCost(i)) : ''}</span></li>`)}</ul>` : html`<p class="muted">Nothing recorded in this period.</p>`}
           <p><a href="#/reports?report=damage">Vehicle damage report</a> · <a href="#/reports?report=accidents">Accidents report</a></p>
         </section>
         <section class="dash-panel"><h2>Downtime and garages</h2>
           <table class="mini"><tbody><tr><th>Garage visits</th><td class="num">${garageVisits.length}</td></tr><tr><th>Vehicle-days out of service</th><td class="num">${lostDays}</td></tr>
             <tr><th>Vehicles affected</th><td class="num">${new Set(touched.map((e) => e.vehicle_id)).size}</td></tr></tbody></table>
-          ${garageVisits.length ? html`<h3>Visits</h3><ul class="plain">${garageVisits.slice(0, 5).map((e) => html`<li>${vById.get(e.vehicle_id) ? plate(vById.get(e.vehicle_id).registration) : ''} <span class="muted">${UNAVAIL_REASON_LABEL[e.reason]} at ${gById.get(e.garage_id)?.name || 'a garage'}, ${fmtDateShort(e.from_date)}</span></li>`)}</ul>` : ''}
+          ${garageVisits.length ? html`<h3>Visits</h3><ul class="plain">${garageVisits.slice(0, 5).map((e) => html`<li>${vById.get(e.vehicle_id) ? plate(vById.get(e.vehicle_id).registration, vById.get(e.vehicle_id).category) : ''} <span class="muted">${UNAVAIL_REASON_LABEL[e.reason]} at ${gById.get(e.garage_id)?.name || 'a garage'}, ${fmtDateShort(e.from_date)}</span></li>`)}</ul>` : ''}
           <p><a href="#/reports?report=status">Vehicle status report</a> · <a href="#/garages">Garages</a></p>
         </section>
       </div>

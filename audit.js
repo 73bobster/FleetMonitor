@@ -6,7 +6,7 @@ import { driverName } from './domain.js';
 import { auditLookups, historyList } from './history.js';
 
 export async function auditView(main) {
-  if (!can.audit) { mount(main, html`<header class="page-head"><h1>Audit log</h1></header>${emptyHtml("You don't have access to the audit log", 'Ask a fleet admin or the superuser.')}`); return; }
+  if (!can.audit) { mount(main, html`<header class="page-head"><h1>Audit log</h1></header>${emptyHtml("You don't have access to the audit log", 'Ask an admin or the superuser.')}`); return; }
   mount(main, html`<header class="page-head"><h1>Audit log</h1></header>${loadingHtml()}`);
   const L = await auditLookups();
   const vehicles = [...L.vehicles.values()].sort((a, b) => a.registration.localeCompare(b.registration));

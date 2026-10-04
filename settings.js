@@ -1,13 +1,14 @@
-// Settings (superuser only). Vehicles needed and depots now; users, compliance types, templates and branding come later.
+// Settings (superuser only). Vehicles needed, depots, users and invitations, and the date format. Compliance types, templates and branding come later.
 import * as api from './api.js';
-import { can } from './state.js';
-import { html, mount, on, openModal, fieldsHtml, readForm, toast, loadingHtml, emptyHtml } from './ui.js';
+import { state, can, ROLE_LABEL, ROLE_HINT } from './state.js';
+import { html, mount, on, openModal, fieldsHtml, readForm, toast, loadingHtml, emptyHtml, fmtDateShort, formatDate, DATE_FORMATS, getDateFormat, setDateFormat } from './ui.js';
 import { CATEGORY_LABEL, WEEKDAYS } from './domain.js';
 
 export async function settingsView(main) {
   if (!can.configure) { mount(main, html`<header class="page-head"><h1>Settings</h1></header>${emptyHtml("You don't have access to settings", 'Only the superuser can change settings.')}`); return; }
   mount(main, html`<header class="page-head"><h1>Settings</h1></header>${loadingHtml()}`);
-  let [depots, vehicles, drivers, needs] = await Promise.all([api.listAllDepots(), api.listVehicles(), api.listDrivers(), api.listVehicleRequirements()]);
+  const load = () => Promise.all([api.listAllDepots(), api.listVehicles(), api.listDrivers(), api.listVehicleRequirements(), api.listMembers(), api.listInvitations()]);
+  let [depots, vehicles, drivers, needs, members, invites] = await load();
   // Vehicles needed: one row per vehicle type that is in the fleet (or already has numbers), one box per day of the week.
   const inFleet = (cat) => vehicles.filter((v) => v.category === cat && !v.archived_at && v.status !== 'disposed').length;
   const needFor = (cat) => needs.find((n) => n.category === cat);
@@ -89,16 +90,101 @@ export async function settingsView(main) {
               <button class="btn btn-sm" data-action="${d.archived_at ? 'restore' : 'archive'}" data-id="${d.id}">${d.archived_at ? 'Restore' : 'Archive'}</button></td></tr>`; })}
         </tbody></table>` : emptyHtml('No depots yet', 'Add the sites your vehicles and drivers work from.')}
       </section>
-      <section class="later"><h2>Coming later</h2><p class="muted">Users and roles, task types and reminder timings, message templates, and branding will be managed here.</p></section>`);
+      <section class="settings-block spaced-top">
+        <div class="section-head"><h2>Users</h2><button class="btn btn-primary" data-action="invite">Invite user</button></div>
+        <p class="muted">People who can sign in to ${state.org.name}, and invitations that have not been taken up yet.</p>
+        <table class="grid"><thead><tr><th>Email</th><th>User type</th><th>Status</th><th></th></tr></thead><tbody>
+          ${members.map((m) => html`<tr>
+            <td data-label="Email"><strong>${m.email || 'Unknown'}</strong>${m.user_id === state.user?.id ? html` <span class="tag">You</span>` : ''}</td>
+            <td data-label="User type">${ROLE_LABEL[m.role] || m.role}</td>
+            <td data-label="Status">${m.status === 'active' ? 'Active' : html`<span class="muted">Disabled</span>`}</td><td class="act"></td></tr>`)}
+          ${invites.map((i) => { const expired = new Date(i.expires_at) < new Date(); return html`<tr>
+            <td data-label="Email">${i.email}</td>
+            <td data-label="User type">${ROLE_LABEL[i.role] || i.role}</td>
+            <td data-label="Status">${expired ? html`<span class="c-overdue">Invitation expired ${fmtDateShort(i.expires_at)}</span>` : html`Invited, link works until ${fmtDateShort(i.expires_at)}`}</td>
+            <td class="act">${expired ? html`<button class="btn btn-sm" data-action="reinvite" data-id="${i.id}">Invite again</button>` : html`<button class="btn btn-sm" data-action="link" data-id="${i.id}">Show link</button>`}
+              <button class="btn btn-sm" data-action="revoke" data-id="${i.id}">Revoke</button></td></tr>`; })}
+        </tbody></table>
+      </section>
+      <section class="settings-block">
+        <div class="section-head"><h2>Date format</h2></div>
+        <p class="muted">How dates are shown on every screen and in downloaded reports, for everyone in ${state.org.name}. Boxes where you pick a date follow each person's own browser settings.</p>
+        <form id="date-form" class="inline-form">
+          <div class="field"><label for="date-format">Format</label><select id="date-format" name="date_format">${DATE_FORMATS.map(([k]) => html`<option value="${k}" ${k === getDateFormat() ? 'selected' : ''}>${formatDate(new Date(), k)} (${k})</option>`)}</select></div>
+          <button class="btn btn-primary" type="submit">Save date format</button>
+        </form>
+      </section>
+      <section class="later"><h2>Coming later</h2><p class="muted">Changing or removing a user's access, task types and reminder timings, message templates, and branding will be managed here.</p></section>`);
     wireNeeds();
+    main.querySelector('#date-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const btn = e.target.querySelector('button'); btn.disabled = true;
+      try { const f = e.target.elements.date_format.value; await api.saveOrgSettings({ date_format: f }); setDateFormat(f); toast('Date format saved.'); draw(); }
+      catch (ex) { toast(ex.message || 'Could not save.', 'error'); btn.disabled = false; }
+    });
   }
-  const reload = async () => { [depots, vehicles, drivers, needs] = await Promise.all([api.listAllDepots(), api.listVehicles(), api.listDrivers(), api.listVehicleRequirements()]); draw(); };
+
+  // ---- Users and invitations ----
+  const ROLES = ['superuser', 'fleet_admin', 'fleet_manager', 'reviewer'];
+  const inviteLink = (i) => `${location.origin}${location.pathname}?invite=${i.token}`;
+  // The app does not send email itself: the superuser copies the link, or opens their own mail app with it written out.
+  function showInvite(i) {
+    const link = inviteLink(i);
+    const subject = `Your invitation to the ${state.org.name} fleet system`;
+    const body = `Hello,\n\nYou have been invited to the ${state.org.name} fleet system as ${ROLE_LABEL[i.role]}.\n\nOpen this link and create your account with this email address (${i.email}):\n${link}\n\nThe link works until ${fmtDateShort(i.expires_at)}.`;
+    const dlg = openModal({
+      title: 'Invitation ready', hideFooter: true,
+      body: html`<p>Send this link to <strong>${i.email}</strong>. They create an account with that email address and join as <strong>${ROLE_LABEL[i.role]}</strong>. The link works until ${fmtDateShort(i.expires_at)}.</p>
+        <div class="field"><label for="invite-link">Invitation link</label><input type="text" id="invite-link" readonly value="${link}"></div>
+        <p class="invite-actions"><button type="button" class="btn btn-primary" data-copy>Copy link</button>
+          <a class="btn" href="mailto:${i.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}">Email it</a></p>
+        <p class="hint">FleetMonitor does not send the email itself. "Email it" opens your own mail app with the message written for you.</p>`,
+    });
+    const box = dlg.querySelector('#invite-link');
+    box.addEventListener('focus', () => box.select());
+    dlg.querySelector('[data-copy]').addEventListener('click', async () => {
+      try { await navigator.clipboard.writeText(link); } catch { box.select(); document.execCommand?.('copy'); }
+      toast('Link copied.');
+    });
+  }
+  function inviteModal(preset = {}) {
+    const fields = [
+      { name: 'email', label: 'Email address', type: 'email', required: true, span: 2, autocomplete: 'off', hint: 'They must create their account with this exact address.' },
+      { name: 'role', label: 'User type', type: 'select', required: true, span: 2, options: ROLES.map((r) => [r, ROLE_LABEL[r]]) },
+    ];
+    const dlg = openModal({
+      title: 'Invite user', submitLabel: 'Create invitation',
+      body: html`${fieldsHtml(fields, preset)}<dl class="role-hints">${ROLES.map((r) => html`<div><dt>${ROLE_LABEL[r]}</dt><dd>${ROLE_HINT[r]}</dd></div>`)}</dl>`,
+      onSubmit: async (f) => {
+        const v = readForm(f, fields);
+        const email = String(v.email || '').toLowerCase();
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error('Enter a full email address.');
+        if (!ROLES.includes(v.role)) throw new Error('Choose a user type.');
+        if (members.some((m) => m.status === 'active' && m.email.toLowerCase() === email)) throw new Error('That person is already a user here.');
+        const inv = await api.createInvitation({ email, role: v.role });
+        dlg.addEventListener('close', () => showInvite(inv), { once: true });   // show the link once this dialog has closed
+        await reload();
+      },
+    });
+  }
+  const reload = async () => { [depots, vehicles, drivers, needs, members, invites] = await load(); draw(); };
   const open = (d) => openModal({
     title: d ? 'Edit depot' : 'Add depot', submitLabel: 'Save', body: fieldsHtml(specs, d || {}),
     onSubmit: async (f) => { const v = readForm(f, specs); await api.saveDepot(v, d?.id); toast('Depot saved.'); await reload(); },
   });
   draw();
   on(main, {
+    invite: () => inviteModal(),
+    reinvite: (el) => { const i = invites.find((x) => x.id === el.dataset.id); inviteModal({ email: i.email, role: i.role }); },
+    link: (el) => showInvite(invites.find((x) => x.id === el.dataset.id)),
+    revoke: (el) => {
+      const i = invites.find((x) => x.id === el.dataset.id);
+      openModal({
+        title: 'Revoke this invitation?', submitLabel: 'Revoke invitation', danger: true,
+        body: html`<p>The link sent to <strong>${i.email}</strong> will stop working. You can invite them again later.</p>`,
+        onSubmit: async () => { await api.revokeInvitation(i.id); toast('Invitation revoked.'); await reload(); },
+      });
+    },
     add: () => open(null),
     edit: (el) => open(depots.find((d) => d.id === el.dataset.id)),
     archive: (el) => {

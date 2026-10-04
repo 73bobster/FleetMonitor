@@ -109,6 +109,6 @@ export function historyList(entries, L, { subject = false } = {}) {
   if (!entries.length) return html`<p class="muted">No changes recorded for this selection.</p>`;
   return html`<ul class="history">${entries.map((e) => html`<li>
     <span class="muted">${fmtDateTime(e.occurred_at)}</span> <strong>${e.actor_label || 'System'}</strong>
-    ${subject ? html`<span class="subject">${e.vehicle_id && L.vehicles.get(e.vehicle_id) ? plate(L.vehicles.get(e.vehicle_id).registration) : ''}${e.driver_id && L.drivers.get(e.driver_id) ? html` <span class="tag">${driverName(L.drivers.get(e.driver_id))}</span>` : ''}</span>` : ''}
+    ${subject ? html`<span class="subject">${e.vehicle_id && L.vehicles.get(e.vehicle_id) ? plate(L.vehicles.get(e.vehicle_id).registration, L.vehicles.get(e.vehicle_id).category) : ''}${e.driver_id && L.drivers.get(e.driver_id) ? html` <span class="tag">${driverName(L.drivers.get(e.driver_id))}</span>` : ''}</span>` : ''}
     ${describe(e, L)}${needsChips(e) ? html`<div class="chips">${changes(e, L, ['archived_at'])}</div>` : ''}</li>`)}</ul>`;
 }

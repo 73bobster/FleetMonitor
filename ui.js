@@ -1,5 +1,5 @@
 // UI toolkit: escaped-by-default templating, dates, forms, modals, toasts.
-import { STATUS_LABEL } from './domain.js';
+import { STATUS_LABEL, CATEGORY_LABEL } from './domain.js';
 
 // ---- Templating ---------------------------------------------------------
 // html`...` escapes every interpolated value unless it is itself html`...` or raw(...).
@@ -14,7 +14,35 @@ export const html = (strings, ...vals) => {
   for (let i = 0; i < vals.length; i++) out += part(vals[i]) + strings[i + 1];
   return new Safe(out);
 };
-export const mount = (el, safe) => { el.innerHTML = safe instanceof Safe ? safe.s : esc(safe); };
+export const mount = (el, safe) => { el.innerHTML = safe instanceof Safe ? safe.s : esc(safe); keepDatesWhole(el); };
+
+// A date written with hyphens (04-Oct-26) would otherwise be split across two lines at a hyphen. After each render,
+// date text is wrapped in a span that stays on one line. Only visible text is touched: never attributes, form
+// fields, drop-down options or charts.
+const HYPHEN_DATE = /\b(?:\d{2}-[A-Z][a-z]{2}(?:-\d{2})?|\d{4}-\d{2}-\d{2})\b/g;
+function keepDatesWhole(root) {
+  if (!dateFormat.includes('-') || typeof document === 'undefined' || typeof NodeFilter === 'undefined' || !document.createTreeWalker) return;
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  const found = [];
+  for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+    const p = n.parentElement;
+    if (!p || p.closest('textarea, select, script, style, svg, .nw')) continue;
+    HYPHEN_DATE.lastIndex = 0;
+    if (HYPHEN_DATE.test(n.nodeValue)) found.push(n);
+  }
+  for (const n of found) {
+    // The whole piece of text goes into one span, so that where a cell lays its contents out side by side
+    // (the stacked tables on a phone) the text still counts as a single item, as it did before.
+    const text = n.nodeValue; const whole = document.createElement('span'); let last = 0;
+    for (const m of text.matchAll(HYPHEN_DATE)) {
+      whole.append(text.slice(last, m.index));
+      const span = document.createElement('span'); span.className = 'nw'; span.textContent = m[0]; whole.append(span);
+      last = m.index + m[0].length;
+    }
+    whole.append(text.slice(last));
+    n.replaceWith(whole);
+  }
+}
 export const isSafe = (v) => v instanceof Safe;
 
 // Click delegation: <button data-action="save"> calls handlers.save(el, event).
@@ -33,12 +61,34 @@ export const toISO = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d
 export const todayStr = () => toISO(new Date());
 export const parseISO = (s) => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); };
 export const addDaysISO = (s, n) => { const d = parseISO(s); d.setDate(d.getDate() + n); return toISO(d); };
-const dateLong = new Intl.DateTimeFormat('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
-const dateShort = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
-const dateTime = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
-export const fmtDate = (s) => (s ? dateLong.format(parseISO(String(s).slice(0, 10))) : '');
-export const fmtDateShort = (s) => (s ? dateShort.format(parseISO(String(s).slice(0, 10))) : '');
-export const fmtDateTime = (s) => (s ? dateTime.format(new Date(s)) : '');
+// Every date on screen, in reports and in downloads goes through formatDate, so one setting changes them all.
+// The format is chosen per organisation in Settings (organisations.settings.date_format). The first is the default.
+export const DATE_FORMATS = [['dd-Mmm-yy', '04-Oct-26'], ['dd Mmm yyyy', '4 Oct 2026'], ['dd/mm/yyyy', '04/10/2026'], ['dd/mm/yy', '04/10/26'], ['mm/dd/yyyy', '10/04/2026'], ['yyyy-mm-dd', '2026-10-04']];
+export const DEFAULT_DATE_FORMAT = 'dd-Mmm-yy';
+let dateFormat = DEFAULT_DATE_FORMAT;
+export const setDateFormat = (f) => { dateFormat = DATE_FORMATS.some(([k]) => k === f) ? f : DEFAULT_DATE_FORMAT; };
+export const getDateFormat = () => dateFormat;
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const MONTHS_LONG = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+// year = false leaves the year off, for chart axes and other tight spaces.
+export function formatDate(d, format = dateFormat, year = true) {
+  const dd = pad(d.getDate()); const mm = pad(d.getMonth() + 1); const mon = MONTHS[d.getMonth()]; const yyyy = String(d.getFullYear()); const yy = yyyy.slice(2);
+  switch (format) {
+    case 'dd Mmm yyyy': return `${d.getDate()} ${mon}${year ? ` ${yyyy}` : ''}`;
+    case 'dd/mm/yyyy': return `${dd}/${mm}${year ? `/${yyyy}` : ''}`;
+    case 'dd/mm/yy': return `${dd}/${mm}${year ? `/${yy}` : ''}`;
+    case 'mm/dd/yyyy': return `${mm}/${dd}${year ? `/${yyyy}` : ''}`;
+    case 'yyyy-mm-dd': return year ? `${yyyy}-${mm}-${dd}` : `${mm}-${dd}`;
+    default: return `${dd}-${mon}${year ? `-${yy}` : ''}`;
+  }
+}
+const asDate = (s) => parseISO(String(s).slice(0, 10));
+export const fmtDateShort = (s) => (s ? formatDate(asDate(s)) : '');                                       // 04-Oct-26
+export const fmtDate = (s) => { if (!s) return ''; const d = asDate(s); return `${DAYS[d.getDay()]} ${formatDate(d)}`; };   // Sun 04-Oct-26
+export const fmtDayMonth = (s, weekday = false) => { if (!s) return ''; const d = asDate(s); return `${weekday ? `${DAYS[d.getDay()]} ` : ''}${formatDate(d, dateFormat, false)}`; };   // 04-Oct
+export const fmtMonth = (s, long = false) => { if (!s) return ''; const d = asDate(s); return long ? `${MONTHS_LONG[d.getMonth()]} ${d.getFullYear()}` : `${MONTHS[d.getMonth()]} ${String(d.getFullYear()).slice(2)}`; };
+export const fmtDateTime = (s) => { if (!s) return ''; const d = new Date(s); return `${formatDate(d)} ${pad(d.getHours())}:${pad(d.getMinutes())}`; };
 export const fmtInt = (n) => (n === null || n === undefined ? '' : new Intl.NumberFormat('en-GB').format(n));
 export const fmtMoney = (n, cur = 'GBP') => (n === null || n === undefined ? '' : new Intl.NumberFormat('en-GB', { style: 'currency', currency: cur }).format(n));
 export const plural = (n, one, many = one + 's') => `${n} ${n === 1 ? one : many}`;
@@ -74,7 +124,24 @@ export function formatReg(reg) {
   const m = /^([A-Z]{2}\d{2})([A-Z]{3})$/.exec(r);
   return m ? `${m[1]} ${m[2]}` : String(reg || '').toUpperCase().trim();
 }
-export const plate = (reg) => html`<span class="plate" role="img" aria-label="Registration ${formatReg(reg)}">${formatReg(reg)}</span>`;
+// A small outline of the kind of vehicle, shown beside the plate wherever the vehicle type is known.
+const VEH_WHEELS = '<circle cx="7" cy="16.5" r="2.3"/><circle cx="17" cy="16.5" r="2.3"/>';
+const VEH_ICONS = {
+  car: `<path d="M2.5 16v-2.3c0-.6.4-1.1 1-1.2L6 11.5l2.2-3.6c.2-.3.5-.4.8-.4h6c.3 0 .6.1.8.4l2.2 3.6 2.5 1c.6.1 1 .6 1 1.2V16h-2.2M2.5 16h2.2M9.3 16h5.4M6.5 11.5h11"/>${VEH_WHEELS}`,
+  van: `<path d="M2 16V8.5C2 7.7 2.7 7 3.5 7H14l4.5 4 2.7.9c.5.2.8.6.8 1.1V16h-2.7M2 16h2.7M9.3 16h5.4M14 7v4h4.5"/>${VEH_WHEELS}`,
+  light_goods: `<path d="M2 16v-4.5h9.5V8h4.3l3 3.5 2.2.7c.6.2 1 .7 1 1.3V16h-2.7M2 16h2.7M9.3 16h5.4M11.5 11.5h7.3"/>${VEH_WHEELS}`,
+  hgv: `<path d="M1.5 16V5.5h12V16M13.5 9H18l3.5 3.5V16h-2.2M1.5 16h2.2M8.3 16h6.4M17 9v3.5h4.5"/><circle cx="6" cy="16.5" r="2.3"/><circle cx="17" cy="16.5" r="2.3"/>`,
+  bus: `<path d="M2 16V7.5C2 6.7 2.7 6 3.5 6h17c.8 0 1.5.7 1.5 1.5V16h-2.7M2 16h2.7M9.3 16h5.4M2 11h20M8 6v5M14 6v5"/>${VEH_WHEELS}`,
+  trailer: `<path d="M6 15.5V6h15.5v9.5h-4.2M6 15.5h6.7M6 13.5H2M4 13.5V18"/><circle cx="15" cy="16.5" r="2.3"/>`,
+  plant: `<path d="M4 12V6.5h6l1.5 4.5H17l3 1.5V15M4 6.5V5M11.5 11H4"/><circle cx="7" cy="15.5" r="3.5"/><circle cx="18.5" cy="17" r="2"/>`,
+};
+VEH_ICONS.other = VEH_ICONS.van;
+export const vehIcon = (category) => (VEH_ICONS[category] ? raw(`<svg class="veh-ico" viewBox="0 0 24 24" role="img" aria-label="${esc(CATEGORY_LABEL[category])}"><title>${esc(CATEGORY_LABEL[category])}</title>${VEH_ICONS[category]}</svg>`) : '');
+// plate(registration) draws the plate; plate(registration, category) adds the vehicle-type icon in front of it.
+export const plate = (reg, category) => {
+  const p = html`<span class="plate" role="img" aria-label="Registration ${formatReg(reg)}">${formatReg(reg)}</span>`;
+  return VEH_ICONS[category] ? html`<span class="veh">${vehIcon(category)}${p}</span>` : p;
+};
 
 // A logo image that falls back to the organisation's name as text if the picture cannot load.
 export const logoImg = (url, name, extraClass = '') => (url

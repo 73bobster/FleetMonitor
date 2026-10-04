@@ -1,6 +1,6 @@
 // Vehicle availability over a period: how many vehicles were available and unavailable each day, week or month,
 // split into vans and HGVs. The calculation is a pure function so it can be tested on its own.
-import { html, raw, esc, addDaysISO, parseISO, todayStr } from './ui.js';
+import { html, raw, esc, addDaysISO, parseISO, todayStr, fmtDate, fmtDayMonth, fmtMonth } from './ui.js';
 import { daysInPeriod } from './insight.js';
 
 // Buses, trailers and plant count with HGVs; everything else (vans, light goods, cars) counts with vans.
@@ -17,7 +17,6 @@ export function eventCoversDay(e, day, today) {
 }
 
 const mondayOf = (day) => addDaysISO(day, -((parseISO(day).getDay() + 6) % 7));
-const fmt = (d, o) => parseISO(d).toLocaleDateString('en-GB', o);
 
 export function buildAvailabilitySeries(vehicles, events, p, today = todayStr()) {
   const fleet = vehicles.filter((v) => !v.archived_at);
@@ -49,10 +48,10 @@ export function buildAvailabilitySeries(vehicles, events, p, today = todayStr())
   for (const b of buckets) {
     for (const k of Object.keys(sums)) { sums[k] += b[k]; b[k] /= b.days; }   // weeks and months show the daily average
     b.avail = b.availVan + b.availHgv; b.unav = b.unavVan + b.unavHgv; b.total = b.avail + b.unav;
-    b.label = unit === 'day' ? fmt(b.first, { day: 'numeric', month: 'short' }) : unit === 'week' ? fmt(b.key, { day: 'numeric', month: 'short' }) : fmt(`${b.key}-01`, { month: 'short', year: '2-digit' });
-    b.title = unit === 'day' ? fmt(b.first, { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })
-      : unit === 'week' ? `Week of ${fmt(b.key, { weekday: 'short', day: 'numeric', month: 'short' })}${b.days < 7 ? ` (${b.days} days in the period)` : ''}`
-        : `${fmt(`${b.key}-01`, { month: 'long', year: 'numeric' })}${b.days < 28 ? ` (${b.days} days in the period)` : ''}`;
+    b.label = unit === 'day' ? fmtDayMonth(b.first) : unit === 'week' ? fmtDayMonth(b.key) : fmtMonth(`${b.key}-01`);
+    b.title = unit === 'day' ? fmtDate(b.first)
+      : unit === 'week' ? `Week of ${fmtDate(b.key)}${b.days < 7 ? ` (${b.days} days in the period)` : ''}`
+        : `${fmtMonth(`${b.key}-01`, true)}${b.days < 28 ? ` (${b.days} days in the period)` : ''}`;
   }
   const pct = (a, u) => (a + u ? Math.round((a / (a + u)) * 1000) / 10 : null);
   return {

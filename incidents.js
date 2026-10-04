@@ -23,7 +23,7 @@ export function incidentTable(list, L, { hideVehicle = false, hideDriver = false
     ${list.map((i) => html`<tr>
       <td data-label="Date"><a href="#/incidents/${i.id}">${fmtDateShort(i.incident_date)}</a></td>
       <td data-label="What"><strong>${incidentTitle(i)}</strong></td>
-      ${hideVehicle ? '' : html`<td data-label="Vehicle">${i.vehicle_id && L.vehicles.get(i.vehicle_id) ? html`<a class="plate-link" href="#/vehicles/${i.vehicle_id}">${plate(L.vehicles.get(i.vehicle_id).registration)}</a>` : ''}</td>`}
+      ${hideVehicle ? '' : html`<td data-label="Vehicle">${i.vehicle_id && L.vehicles.get(i.vehicle_id) ? html`<a class="plate-link" href="#/vehicles/${i.vehicle_id}">${plate(L.vehicles.get(i.vehicle_id).registration, L.vehicles.get(i.vehicle_id).category)}</a>` : ''}</td>`}
       ${hideDriver ? '' : html`<td data-label="Driver">${i.driver_id ? html`<a href="#/drivers/${i.driver_id}">${driverName(L.drivers.get(i.driver_id)) || 'Driver'}</a>` : html`<span class="muted">Not named</span>`}</td>`}
       <td data-label="Details">${i.kind === 'fine'
         ? html`${i.reference || ''}${i.paid_on ? html` <span class="tag">Paid</span>` : i.pay_by ? html` <span class="sub">Pay by ${fmtDateShort(i.pay_by)}</span>` : ''}`
@@ -184,7 +184,7 @@ export async function incidentDetail(main, { id }) {
       ${fine && i.nominate_by && !i.nominated_on ? html`<button class="btn btn-primary" data-action="act" data-act="nominated">Record driver named</button>` : ''}</div>` : ''}
     <div class="cols">
       <section><h2>What happened</h2>${facts([
-        ['Vehicle', v ? html`<a class="plate-link" href="#/vehicles/${v.id}">${plate(v.registration)}</a>` : ''], ['Driver', d ? html`<a href="#/drivers/${d.id}">${driverName(d)}</a>` : (i.driver_id ? 'Driver' : 'Not named')],
+        ['Vehicle', v ? html`<a class="plate-link" href="#/vehicles/${v.id}">${plate(v.registration, v.category)}</a>` : ''], ['Driver', d ? html`<a href="#/drivers/${d.id}">${driverName(d)}</a>` : (i.driver_id ? 'Driver' : 'Not named')],
         ['Status', INCIDENT_STATUS_LABEL[i.status]], ['Reference', i.reference], ['Description', i.description],
         ...(fine ? [['Type', FINE_TYPE_LABEL[i.fine_type]], ['Appeal', i.appeal_status !== 'none' ? APPEAL_LABEL[i.appeal_status] : '']]
           : [['At fault', yesNo(i.at_fault)], ['Injuries', i.injuries ? 'Yes' : ''], ['Police reference', i.police_reference], ['Other party', i.third_party_details], ['Repaired on', fmtDate(i.repaired_on)]]),

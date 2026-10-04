@@ -14,7 +14,7 @@ const isQuiet = (t) => t.status === 'snoozed' || t.status === 'dismissed';
 export function taskWho(t, ctx = {}) {
   if (t.vehicle_id && t.applies_to === 'vehicle') {
     const v = ctx.vehicles?.get(t.vehicle_id);
-    return html`${plate(v?.registration || String(t.target_label).split(' - ')[0])}${v?.nickname ? html` <span class="muted">${v.nickname}</span>` : ''}`;
+    return html`${plate(v?.registration || String(t.target_label).split(' - ')[0], v?.category)}${v?.nickname ? html` <span class="muted">${v.nickname}</span>` : ''}`;
   }
   return html`<span>${t.target_label}</span>`;
 }

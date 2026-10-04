@@ -14,7 +14,7 @@ Every file sits in one folder, so it uploads to GitHub with no folders to drag. 
 - **Incidents:** accidents, damage and fines in one register, with costs and deadlines
 - **Insurance:** policies, vehicles covered, claims, documents
 - **Reports:** vehicle damage (including accident damage), accidents, vehicle mileage, vehicle status; any period; download as Excel or PDF
-- **Settings** (superuser): vehicles needed (the minimum of each vehicle type for each day of the week, read by the Planner) and depots. **Audit log** (fleet admins and superuser): searchable by period, vehicle and driver
+- **Settings** (superuser): vehicles needed (the minimum of each vehicle type for each day of the week, read by the Planner), depots, users and invitations (invite by email as Superuser, Admin, Fleet manager or Management, which is read only), and the date format used on every screen and download (dd-Mmm-yy unless changed). **Audit log** (admins and the superuser): searchable by period, vehicle and driver
 - **Documents:** upload from files, a folder, the phone camera, a webcam, or drag and drop
 
 ## Files

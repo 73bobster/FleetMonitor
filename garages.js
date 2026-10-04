@@ -30,7 +30,7 @@ export async function garagesView(main) {
               ${g.address || g.postcode ? html`<div class="sub">${[g.address, g.postcode].filter(Boolean).join(', ')}</div>` : ''}${g.is_unknown && g.notes ? html`<div class="sub">${g.notes}</div>` : ''}</td>
             <td data-label="Contact">${g.contact_name || ''}${g.phone ? html`<div class="sub">${g.phone}</div>` : ''}${g.email ? html`<div class="sub"><a href="mailto:${g.email}">${g.email}</a></div>` : ''}</td>
             <td data-label="Types of work">${g.is_unknown ? '' : (g.services || []).map((s) => GARAGE_SERVICE_LABEL[s]).join(', ') || html`<span class="muted">Not set</span>`}</td>
-            <td data-label="At the garage now">${there.length ? there.map((v) => html`<a class="plate-link" href="#/vehicles/${v.id}?tab=availability">${plate(v.registration)}</a> `) : html`<span class="muted">None</span>`}</td>
+            <td data-label="At the garage now">${there.length ? there.map((v) => html`<a class="plate-link" href="#/vehicles/${v.id}?tab=availability">${plate(v.registration, v.category)}</a> `) : html`<span class="muted">None</span>`}</td>
             <td class="act">${can.write && !g.is_unknown ? html`<button class="btn btn-sm" data-action="edit" data-id="${g.id}">Edit</button> <button class="btn btn-sm" data-action="${g.archived_at ? 'restore' : 'archive'}" data-id="${g.id}">${g.archived_at ? 'Restore' : 'Archive'}</button>` : ''}</td></tr>`;
         })}</tbody></table>`);
     main.querySelector('#g-arch').addEventListener('change', (e) => { ui.archived = e.target.checked; draw(); });

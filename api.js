@@ -121,6 +121,34 @@ export async function saveDepot(values, id) {
   return ok(await sb.from('depots').insert({ ...values, organisation_id: org() }).select().single());
 }
 
+// ---- Users, invitations and organisation settings (superuser; the database refuses anyone else) ----
+// Everyone with access to this organisation, with the email address from their profile.
+export async function listMembers() {
+  const members = ok(await sb.from('memberships').select('*').eq('organisation_id', org()).order('created_at'));
+  const ids = members.map((m) => m.user_id);
+  const profiles = ids.length ? ok(await sb.from('profiles').select('id, email, display_name').in('id', ids)) : [];
+  const byId = new Map(profiles.map((p) => [p.id, p]));
+  return members.map((m) => ({ ...m, email: byId.get(m.user_id)?.email || '', display_name: byId.get(m.user_id)?.display_name || '' }));
+}
+// Invitations still waiting: not accepted and not revoked (they may have expired).
+export const listInvitations = async () =>
+  ok(await sb.from('invitations').select('*').eq('organisation_id', org()).is('accepted_at', null).is('revoked_at', null).order('created_at', { ascending: false }));
+// Inviting an address again replaces its earlier invitation, so only one link per person is ever live.
+export async function createInvitation({ email, role }) {
+  const address = String(email).trim().toLowerCase();
+  ok(await sb.from('invitations').update({ revoked_at: new Date().toISOString() }).eq('organisation_id', org()).eq('email', address).is('accepted_at', null).is('revoked_at', null));
+  return ok(await sb.from('invitations').insert({ organisation_id: org(), email: address, role }).select().single());
+}
+export const revokeInvitation = async (id) =>
+  ok(await sb.from('invitations').update({ revoked_at: new Date().toISOString() }).eq('id', id).eq('organisation_id', org()).select().single());
+// Merges the given keys into the organisation's settings (read first, so other settings are kept).
+export async function saveOrgSettings(patch) {
+  const cur = ok(await sb.from('organisations').select('settings').eq('id', org()).single());
+  const row = ok(await sb.from('organisations').update({ settings: { ...(cur.settings || {}), ...patch } }).eq('id', org()).select().single());
+  state.org.settings = row.settings;
+  return row;
+}
+
 // ---- Vehicles needed: the minimum by vehicle type and day of the week (read by the Planner) ----
 export const listVehicleRequirements = async () =>
   ok(await sb.from('vehicle_requirements').select('*').eq('organisation_id', org()).order('category'));

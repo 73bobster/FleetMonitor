@@ -3,7 +3,14 @@
 
 export const state = { user: null, memberships: [], membership: null, org: null, role: null };
 
-export const ROLE_LABEL = { superuser: 'Superuser', fleet_admin: 'Fleet admin', fleet_manager: 'Fleet manager', reviewer: 'Reviewer' };
+// 'reviewer' is the read-only role, shown to people as Management.
+export const ROLE_LABEL = { superuser: 'Superuser', fleet_admin: 'Admin', fleet_manager: 'Fleet manager', reviewer: 'Management' };
+export const ROLE_HINT = {
+  superuser: 'Everything, including settings and inviting users.',
+  fleet_admin: 'Add and change everything, see the audit log and override licence blocks. No settings.',
+  fleet_manager: 'Add and change vehicles, drivers, incidents, insurance and garage visits.',
+  reviewer: 'Read only. Sees the dashboard, reports and records, but not drivers\' licence details, points or convictions.',
+};
 
 const WRITERS = ['superuser', 'fleet_admin', 'fleet_manager'];
 export const can = {

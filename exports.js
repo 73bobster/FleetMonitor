@@ -2,7 +2,9 @@
 //
 // A report model looks like:
 //   { title, subtitle, columns: [{ key, label, type: 'text' | 'date' | 'money' | 'int' | 'number', width }], rows: [{ key: value }], totals: { key: value } | null }
-// Dates are ISO strings (yyyy-mm-dd). Money and numbers are numbers.
+// Dates are ISO strings (yyyy-mm-dd). Money and numbers are numbers. Dates are written in the organisation's date format.
+
+import { fmtDateShort, formatDate, getDateFormat } from './ui.js';
 
 const enc = new TextEncoder();
 const pad = (n, w = 2) => String(n).padStart(w, '0');
@@ -47,9 +49,11 @@ const serial = (iso) => { const [y, m, d] = String(iso).slice(0, 10).split('-').
 
 // Cell styles (indexes into cellXfs in STYLES below)
 const S = { title: 1, header: 2, text: 3, date: 4, money: 5, int: 6, number: 7, totalText: 8, totalMoney: 9, totalInt: 10, totalNumber: 11, note: 12 };
-const STYLES = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+// The organisation's date format as an Excel number format, so date cells stay real dates that sort and filter.
+const EXCEL_DATE = { 'dd-Mmm-yy': 'dd\\-mmm\\-yy', 'dd Mmm yyyy': 'd\\ mmm\\ yyyy', 'dd/mm/yyyy': 'dd/mm/yyyy', 'dd/mm/yy': 'dd/mm/yy', 'mm/dd/yyyy': 'mm/dd/yyyy', 'yyyy-mm-dd': 'yyyy\\-mm\\-dd' };
+const stylesXml = () => `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
-<numFmts count="3"><numFmt numFmtId="164" formatCode="dd\\ mmm\\ yyyy"/><numFmt numFmtId="165" formatCode="&quot;£&quot;#,##0.00"/><numFmt numFmtId="166" formatCode="#,##0.0"/></numFmts>
+<numFmts count="3"><numFmt numFmtId="164" formatCode="${EXCEL_DATE[getDateFormat()] || EXCEL_DATE['dd-Mmm-yy']}"/><numFmt numFmtId="165" formatCode="&quot;£&quot;#,##0.00"/><numFmt numFmtId="166" formatCode="#,##0.0"/></numFmts>
 <fonts count="5"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Calibri"/></font><font><b/><sz val="14"/><name val="Calibri"/></font><font><i/><sz val="10"/><color rgb="FF555555"/><name val="Calibri"/></font></fonts>
 <fills count="4"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FFFF0066"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFF1F1F1"/><bgColor indexed="64"/></patternFill></fill></fills>
 <borders count="2"><border><left/><right/><top/><bottom/><diagonal/></border><border><left style="thin"><color rgb="FFDDDDDD"/></left><right style="thin"><color rgb="FFDDDDDD"/></right><top style="thin"><color rgb="FFDDDDDD"/></top><bottom style="thin"><color rgb="FFDDDDDD"/></bottom><diagonal/></border></borders>
@@ -102,17 +106,16 @@ export function buildXlsx(model) {
     { name: '_rels/.rels', data: enc.encode(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>`) },
     { name: 'xl/workbook.xml', data: enc.encode(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="${sheetName}" sheetId="1" r:id="rId1"/></sheets></workbook>`) },
     { name: 'xl/_rels/workbook.xml.rels', data: enc.encode(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>`) },
-    { name: 'xl/styles.xml', data: enc.encode(STYLES) },
+    { name: 'xl/styles.xml', data: enc.encode(stylesXml()) },
     { name: 'xl/worksheets/sheet1.xml', data: enc.encode(sheet) },
   ];
   return zipStore(files);
 }
 
 // ---- PDF (Courier, so every character is the same width and tables line up exactly) ---------
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 function cellText(v, type) {
   if (v === null || v === undefined || v === '') return '';
-  if (type === 'date') { if (!/^\d{4}-\d{2}-\d{2}/.test(String(v))) return String(v); const [y, m, d] = String(v).slice(0, 10).split('-').map(Number); return `${d} ${MONTHS[m - 1]} ${y}`; }
+  if (type === 'date') return /^\d{4}-\d{2}-\d{2}/.test(String(v)) ? fmtDateShort(v) : String(v);
   if (type === 'money') return `£${Number(v).toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   if (type === 'int') return Number(v).toLocaleString('en-GB', { maximumFractionDigits: 0 });
   if (type === 'number') return Number(v).toLocaleString('en-GB', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
@@ -181,7 +184,7 @@ export function buildPdf(model, generated = new Date()) {
   model.rows.forEach((r) => drawRow(r, false));
   if (model.totals) drawRow(null, true);
 
-  const stamp = `${generated.getDate()} ${MONTHS[generated.getMonth()]} ${generated.getFullYear()}`;
+  const stamp = formatDate(generated);
   const count = pages.length;
   pages.forEach((p, i) => p.push(`0.35 g BT /F1 7 Tf ${M} 20 Td (${esc(`Generated ${stamp}`)}) Tj ET`, `0.35 g BT /F1 7 Tf ${W - M - 40} 20 Td (${esc(`Page ${i + 1} of ${count}`)}) Tj ET`));
 

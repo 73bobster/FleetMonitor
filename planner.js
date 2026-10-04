@@ -3,7 +3,7 @@
 // The sums are in buildPlan, a pure function, so they can be tested on their own.
 import * as api from './api.js';
 import { can } from './state.js';
-import { html, mount, plate, formatReg, loadingHtml, fmtDate, fmtDateShort, todayStr, addDaysISO, parseISO } from './ui.js';
+import { html, mount, plate, formatReg, loadingHtml, fmtDate, fmtDateShort, fmtDayMonth, fmtMonth, todayStr, addDaysISO, parseISO } from './ui.js';
 import { CATEGORY_LABEL, UNAVAIL_REASON_LABEL, WEEKDAYS, CATEGORY_PLURAL, CATEGORY_NOUN } from './domain.js';
 
 // Short labels for the blocks in the grid.
@@ -108,8 +108,7 @@ const KEY = 'fm:planner';
 const WEEK_CHOICES = [2, 4, 6, 8];
 const loadView = () => { try { const s = JSON.parse(sessionStorage.getItem(KEY)); if (WEEK_CHOICES.includes(s?.weeks) && s.offset >= 0) return s; } catch { /* use the default */ } return { weeks: 4, offset: 0 }; };
 const saveView = (s) => { try { sessionStorage.setItem(KEY, JSON.stringify(s)); } catch { /* not remembered */ } };
-const dm = (d, o) => parseISO(d).toLocaleDateString('en-GB', o);
-const rangeText = (a, b) => (a === b ? dm(a, { weekday: 'short', day: 'numeric', month: 'short' }) : `${dm(a, { weekday: 'short', day: 'numeric', month: 'short' })} to ${dm(b, { weekday: 'short', day: 'numeric', month: 'short' })}`);
+const rangeText = (a, b) => (a === b ? fmtDayMonth(a, true) : `${fmtDayMonth(a, true)} to ${fmtDayMonth(b, true)}`);
 
 export async function plannerView(main) {
   mount(main, html`<header class="page-head"><h1>Planner</h1></header>${loadingHtml('Loading the planner')}`);
@@ -149,7 +148,7 @@ export async function plannerView(main) {
   function render() {
     const from = addDaysISO(today, view.offset * 7);
     plan = buildPlan({ vehicles, events, tasks, needs, from, days: view.weeks * 7, today });
-    const months = []; for (const d of plan.days) { const k = d.date.slice(0, 7); const m = months[months.length - 1]; if (m && m.k === k) m.n += 1; else months.push({ k, n: 1, label: dm(d.date, { month: 'long', year: 'numeric' }) }); }
+    const months = []; for (const d of plan.days) { const k = d.date.slice(0, 7); const m = months[months.length - 1]; if (m && m.k === k) m.n += 1; else months.push({ k, n: 1, label: fmtMonth(d.date, true) }); }
     const next = plan.shortfalls[0];
     const fig = (label, value, sub, tone = '') => html`<div class="figure ${tone}"><span class="figure-value">${value}</span><span class="figure-label">${label}</span>${sub ? html`<span class="figure-sub">${sub}</span>` : ''}</div>`;
     const runLi = (r, word) => html`<li><strong>${rangeText(r.from, r.to)}</strong>: ${r.days > 1 ? 'up to ' : ''}${noun(r.worst, r.category)} ${word}${r.days > 1 ? html` <span class="muted">(${r.days} days)</span>` : ''}</li>`;
@@ -165,7 +164,7 @@ export async function plannerView(main) {
       ${plan.hasNeeds ? '' : html`<p class="banner-info">No minimum number of vehicles is set, so the planner cannot flag days when you are short. ${can.configure ? html`<a href="#/settings">Set the vehicles needed in Settings</a>.` : 'Ask the superuser to set the vehicles needed in Settings.'}</p>`}
 
       <div class="figures">
-        ${fig('Next shortfall', next ? dm(next.from, { weekday: 'short', day: 'numeric', month: 'short' }) : 'None', next ? `${noun(next.worst, next.category)} short` : plan.hasNeeds ? 'Enough vehicles every day' : 'No minimum set', next ? 'tone-bad' : plan.hasNeeds ? 'tone-good' : '')}
+        ${fig('Next shortfall', next ? fmtDayMonth(next.from, true) : 'None', next ? `${noun(next.worst, next.category)} short` : plan.hasNeeds ? 'Enough vehicles every day' : 'No minimum set', next ? 'tone-bad' : plan.hasNeeds ? 'tone-good' : '')}
         ${fig('Days short', plan.shortDays, plan.shortDays ? 'Fewer vehicles than needed' : '', plan.shortDays ? 'tone-bad' : '')}
         ${fig('Days at risk', plan.riskDays, plan.riskDays ? 'Short if at-risk vehicles are out' : '', plan.riskDays ? 'tone-warn' : '')}
         ${fig('To book', plan.toBook.length, plan.toBook.length ? 'Due in this period, no visit booked' : '', plan.toBook.length ? 'tone-warn' : '')}
@@ -179,7 +178,7 @@ export async function plannerView(main) {
         </thead>
         ${plan.groups.map((g) => html`<tbody>
           <tr class="pl-group"><th class="pl-veh" scope="rowgroup">${CATEGORY_PLURAL[g.category]}</th><td colspan="${plan.days.length}"></td></tr>
-          ${g.rows.map((r) => html`<tr><th class="pl-veh" scope="row"><a class="plate-link" href="#/vehicles/${r.v.id}?tab=availability">${plate(r.v.registration)}</a></th>${r.cells.map((c, i) => cellHtml(r, c, i))}</tr>`)}
+          ${g.rows.map((r) => html`<tr><th class="pl-veh" scope="row"><a class="plate-link" href="#/vehicles/${r.v.id}?tab=availability">${plate(r.v.registration, r.v.category)}</a></th>${r.cells.map((c, i) => cellHtml(r, c, i))}</tr>`)}
           <tr class="pl-count"><th class="pl-veh" scope="row">Available</th>${g.counts.map((c, i) => html`<td class="lvl-${c.level} ${plan.days[i].isToday ? 'is-today' : ''} ${plan.days[i].dow === 0 ? 'wk' : ''}" title="${`${fmtDate(plan.days[i].date)}: ${c.available} available${c.atRisk ? ` (${c.atRisk} at risk)` : ''}, ${c.needed ? `${c.needed} needed` : 'no minimum'}`}">${c.available}</td>`)}</tr>
           <tr class="pl-need"><th class="pl-veh" scope="row">Needed</th>${g.counts.map((c, i) => html`<td class="${plan.days[i].isToday ? 'is-today' : ''} ${plan.days[i].dow === 0 ? 'wk' : ''}">${c.needed || html`<span class="muted">-</span>`}</td>`)}</tr>
         </tbody>`)}
@@ -192,7 +191,7 @@ export async function plannerView(main) {
           ${plan.risks.length ? html`<h3>At risk</h3>${many(plan.risks, (r) => runLi(r, 'short if the at-risk vehicles are out'), 5)}` : ''}
         </section>
         <section class="dash-panel"><h2>To book</h2>
-          ${plan.toBook.length ? many(plan.toBook, ({ t, v }) => html`<li><a class="plate-link" href="#/vehicles/${v.id}?tab=availability">${plate(v.registration)}</a> ${t.type_name} <span class="${t.due_date < today ? 'c-overdue' : 'muted'}">${t.due_date < today ? html`<strong>was due ${fmtDateShort(t.due_date)}</strong>` : `due ${fmtDateShort(t.due_date)}`}</span></li>`) : html`<p class="muted">Nothing due in this period is waiting for a garage visit.</p>`}
+          ${plan.toBook.length ? many(plan.toBook, ({ t, v }) => html`<li><a class="plate-link" href="#/vehicles/${v.id}?tab=availability">${plate(v.registration, v.category)}</a> ${t.type_name} <span class="${t.due_date < today ? 'c-overdue' : 'muted'}">${t.due_date < today ? html`<strong>was due ${fmtDateShort(t.due_date)}</strong>` : `due ${fmtDateShort(t.due_date)}`}</span></li>`) : html`<p class="muted">Nothing due in this period is waiting for a garage visit.</p>`}
         </section>
       </div>`);
 

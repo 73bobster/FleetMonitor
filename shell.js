@@ -1,5 +1,5 @@
 // The signed-in frame: sidebar on desktop, tab bar on mobile, brand colours, org switcher.
-import { html, mount, on, icon, openModal, closeModal, logoImg, wireLogos } from './ui.js';
+import { html, mount, on, icon, openModal, closeModal, logoImg, wireLogos, setDateFormat } from './ui.js';
 import { state, can, ROLE_LABEL } from './state.js';
 import * as api from './api.js';
 
@@ -41,6 +41,7 @@ export function applyBrand(org) {
   if (luminance(accent) !== null) root.style.setProperty('--accent', accent);
   document.querySelector('meta[name="theme-color"]')?.setAttribute('content', primary || '#FF0066');
   document.title = org ? `${org.name} fleet` : 'FleetMonitor';
+  setDateFormat(org?.settings?.date_format);   // the organisation's date format, used by every screen and download
 }
 
 // ---- Frame --------------------------------------------------------------------
