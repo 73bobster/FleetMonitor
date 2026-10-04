@@ -3,6 +3,7 @@ import * as api from './api.js';
 import { state, can, ROLE_LABEL, ROLE_HINT, ROLE_ORDER, ACCESS_SUMMARY, MEMBER_STATUS_LABEL } from './state.js';
 import { html, mount, on, openModal, fieldsHtml, readForm, toast, loadingHtml, emptyHtml, fmtDateShort, formatDate, DATE_FORMATS, getDateFormat, setDateFormat } from './ui.js';
 import { CATEGORY_LABEL, WEEKDAYS } from './domain.js';
+import { DEFAULT_TYPICAL_MPG, DEFAULT_MILES_PER_KWH } from './tco.js';
 
 export async function settingsView(main) {
   if (!can.configure) { mount(main, html`<header class="page-head"><h1>Settings</h1></header>${emptyHtml("You don't have access to settings", 'Only the superuser can change settings.')}`); return; }
@@ -10,6 +11,7 @@ export async function settingsView(main) {
   const load = () => Promise.all([api.listAllDepots(), api.listVehicles(), api.listDrivers(), api.listVehicleRequirements(), api.listMembers(), api.listInvitations()]);
   let [depots, vehicles, drivers, needs, members, invites] = await load();
   let showRemoved = false;
+  const typicalMpg = () => state.org.settings?.typical_mpg || {};   // only the figures this organisation has changed
   // Vehicles needed: one row per vehicle type that is in the fleet (or already has numbers), one box per day of the week.
   const inFleet = (cat) => vehicles.filter((v) => v.category === cat && !v.archived_at && v.status !== 'disposed').length;
   const needFor = (cat) => needs.find((n) => n.category === cat);
@@ -127,8 +129,35 @@ export async function settingsView(main) {
           <button class="btn btn-primary" type="submit">Save date format</button>
         </form>
       </section>
+      <section class="settings-block">
+        <div class="section-head"><h2>Typical fuel economy</h2><a class="btn btn-sm" href="#/costs?tab=fuel">Open fuel prices</a></div>
+        <p class="muted">Used to work out fuel cost for any vehicle that has no fuel economy figure on its own record. These are typical figures for each type, not measurements, and costs that rest on them are marked as such. Leave a box empty to go back to the standard figure.</p>
+        <form id="mpg-form" class="needs" novalidate>
+          <fieldset class="needs-row"><legend><strong>Miles per gallon</strong></legend>
+            <div class="needs-days">${Object.keys(DEFAULT_TYPICAL_MPG).map((c) => html`<label class="needs-day"><span>${CATEGORY_LABEL[c]}</span><input type="number" name="mpg.${c}" min="1" max="200" step="0.1" inputmode="decimal" value="${typicalMpg()[c] ?? ''}" placeholder="${DEFAULT_TYPICAL_MPG[c]}" aria-label="Typical miles per gallon for ${CATEGORY_LABEL[c]}"></label>`)}</div></fieldset>
+          <fieldset class="needs-row"><legend><strong>Electric vehicles</strong></legend>
+            <div class="needs-days"><label class="needs-day"><span>Miles per kWh</span><input type="number" name="kwh" min="0.1" max="20" step="0.1" inputmode="decimal" value="${state.org.settings?.typical_miles_per_kwh ?? ''}" placeholder="${DEFAULT_MILES_PER_KWH}" aria-label="Typical miles per kWh"></label></div></fieldset>
+          <p class="form-error" role="alert" hidden></p>
+          <p><button class="btn btn-primary" type="submit">Save fuel economy</button></p>
+        </form>
+      </section>
       <section class="later"><h2>Coming later</h2><p class="muted">Task types and reminder timings, message templates, and branding will be managed here.</p></section>`);
     wireNeeds();
+    main.querySelector('#mpg-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const form = e.target; const err = form.querySelector('.form-error'); err.hidden = true;
+      const typical = {};
+      for (const c of Object.keys(DEFAULT_TYPICAL_MPG)) {
+        const raw = String(form.elements[`mpg.${c}`].value).trim(); if (raw === '') continue;
+        if (!(Number(raw) >= 1 && Number(raw) <= 200)) { err.textContent = `${CATEGORY_LABEL[c]}: enter miles per gallon between 1 and 200, or leave it empty.`; err.hidden = false; return; }
+        typical[c] = Number(raw);
+      }
+      const kwhRaw = String(form.elements.kwh.value).trim();
+      if (kwhRaw !== '' && !(Number(kwhRaw) >= 0.1 && Number(kwhRaw) <= 20)) { err.textContent = 'Electric: enter miles per kWh between 0.1 and 20, or leave it empty.'; err.hidden = false; return; }
+      const btn = form.querySelector('button[type="submit"]'); btn.disabled = true;
+      try { await api.saveOrgSettings({ typical_mpg: typical, typical_miles_per_kwh: kwhRaw === '' ? null : Number(kwhRaw) }); toast('Fuel economy saved.'); draw(); }
+      catch (ex) { err.textContent = ex.message || 'Could not save.'; err.hidden = false; btn.disabled = false; }
+    });
     main.querySelector('#show-removed')?.addEventListener('change', (e) => { showRemoved = e.target.checked; draw(); });
     main.querySelector('#date-form').addEventListener('submit', async (e) => {
       e.preventDefault();

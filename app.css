@@ -560,3 +560,24 @@ a.tag-link:hover { text-decoration: underline; }
 .attn-what { display: inline-flex; align-items: center; }
 .planner .pl-veh .rag { margin-right: 5px; }
 @media (max-width: 860px) { .rag-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; } .rag-tile { padding: 10px 12px; } .rag-tile-level { font-size: 1.125rem; } }
+
+/* ---- Costs: total cost of ownership and fuel prices ---- */
+.periods-line { margin: -6px 0 16px; font-size: .875rem; color: var(--ink-2); }
+.tco-link { font-size: .875rem; }
+table.tco td.strong, table.tco tfoot td { font-weight: 700; }
+table.tco td .sub { font-weight: 400; }
+.tco-flag { margin-left: 3px; color: var(--soon); font-weight: 700; cursor: help; }
+.tco-notes { margin: 6px 0 0; padding-left: 18px; }
+.tco-notes li { margin: 2px 0; }
+table.tco-lines th { font-weight: 400; color: var(--ink); }
+table.tco-lines th .sub { color: var(--ink-3); font-size: .75rem; }
+table.tco-lines td.pct { width: 52px; color: var(--ink-3); font-size: .75rem; }
+.fuel-table { max-width: 760px; }
+.fuel-table th .sub { font-weight: 400; color: var(--ink-3); }
+.fuel-assumptions { margin-top: 28px; max-width: 760px; }
+.report-actions:last-child { margin-bottom: 0; }
+.section-head .report-actions { margin: 0; }
+table.tco { min-width: 1060px; font-size: .75rem; }
+table.tco th, table.tco td { padding: 9px 9px; }
+table.tco td.num, table.tco tfoot td { white-space: nowrap; overflow-wrap: normal; }
+table.tco thead th { white-space: normal; vertical-align: bottom; }

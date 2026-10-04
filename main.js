@@ -17,6 +17,7 @@ import { dashboardView } from './dashboard.js';
 import { reportsView } from './reports.js';
 import { garagesView } from './garages.js';
 import { plannerView } from './planner.js';
+import { costsView, costDetailView } from './costs.js';
 import { placeholder } from './placeholder.js';
 
 const INVITE_KEY = 'fm:invite';
@@ -58,6 +59,8 @@ route('/insurance', 'insurance', (m) => insuranceList(m));
 route('/insurance/new', 'insurance', (m) => policyForm(m, { id: 'new' }));
 route('/insurance/:id/edit', 'insurance', (m, p) => policyForm(m, p));
 route('/insurance/:id', 'insurance', (m, p, q) => policyDetail(m, p, q));
+route('/costs', 'costs', (m, p, q) => costsView(m, q));
+route('/costs/:id', 'costs', (m, p) => costDetailView(m, p));
 route('/reports', 'reports', (m, p, q) => reportsView(m, p, q));
 route('/audit', 'audit', (m) => auditView(m));
 route('/settings', 'settings', (m) => settingsView(m));

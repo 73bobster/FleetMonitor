@@ -106,6 +106,7 @@ const ICONS = {
   drivers: '<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/>',
   insurance: '<path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/>',
   reports: '<path d="M5 20V10M12 20V4M19 20v-7"/>',
+  costs: '<path d="M17 20H7c1.6-1.4 2.2-3.1 2.2-5V8.6A3.6 3.6 0 0 1 12.8 5c1.6 0 2.9 1 3.4 2.4M6.5 13.2h7"/>',
   audit: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
   incidents: '<path d="M12 3l10 18H2z"/><path d="M12 10v5M12 18v.5"/>',
   dashboard: '<rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/>',

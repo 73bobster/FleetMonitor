@@ -3,7 +3,7 @@ import * as api from './api.js';
 import { can } from './state.js';
 import {
   html, mount, on, plate, pill, facts, fieldsHtml, readForm, openModal, toast, loadingHtml, emptyHtml, errorHtml,
-  fmtDate, fmtDateShort, fmtInt, fmtMoney, dueText, todayStr, formatReg,
+  fmtDate, fmtDateShort, fmtInt, fmtMoney, dueText, todayStr, addDaysISO, formatReg,
 } from './ui.js';
 import {
   CATEGORY_LABEL, FUEL_LABEL, OWNERSHIP_LABEL, VEHICLE_STATUS_LABEL, DISPOSAL_REASON_LABEL, COST_CATEGORY_LABEL, LICENCE_STATUS_LABEL, BLOCKING_LICENCE,
@@ -115,7 +115,7 @@ const sections = (depots, existing) => [
     { name: 'gross_weight_kg', label: 'Gross weight (kg)', type: 'number', min: '1', step: '1', hint: 'Over 3,500 kg usually means tachograph and operator licence rules apply.' },
     { name: 'payload_kg', label: 'Allowable payload (kg)', type: 'number', min: '1', step: '1', hint: 'The most it may carry: gross weight minus unladen weight, both shown on the V5C.' },
     { name: 'seats', label: 'Seats', type: 'number', min: '0', step: '1' },
-    { name: 'mpg', label: 'Fuel economy (mpg)', type: 'number', min: '0', step: '0.1' },
+    { name: 'mpg', label: 'Fuel economy (mpg)', type: 'number', min: '0', step: '0.1', hint: 'Used to work out fuel cost. For an electric vehicle, enter miles per kWh.' },
   ] },
   { title: 'Ownership', specs: [
     { name: 'ownership_type', label: 'Ownership', type: 'select', required: true, options: opts(OWNERSHIP_LABEL) },
@@ -166,6 +166,26 @@ export async function vehicleForm(main, { id }) {
 }
 
 // ---- Disposal ----------------------------------------------------------------
+// A disposed vehicle that comes back starts a new period in the fleet. The disposal it had stays on record.
+function reinstateModal(v, done) {
+  const specs = [
+    { name: 'date', label: 'Date it came back', type: 'date', required: true, min: addDaysISO(v.disposed_date, 1), max: todayStr(), value: todayStr() },
+    { name: 'notes', label: 'Notes', type: 'textarea', span: 2, placeholder: 'For example: bought back from the dealer' },
+  ];
+  openModal({
+    title: `Bring ${formatReg(v.registration)} back into the fleet`, submitLabel: 'Bring back into the fleet',
+    body: html`<p class="muted">This starts a new period in the fleet. The disposal on ${fmtDateShort(v.disposed_date)} stays on record, and nothing can be dated between then and the day it came back.</p>
+      ${fieldsHtml(specs)}
+      <p class="hint">Afterwards, add it to an insurance policy, assign a driver, and check its compliance dates and ownership details: they are as they were when it left.</p>`,
+    onSubmit: async (f) => {
+      const x = readForm(f, specs);
+      if (!x.date) throw new Error('Give the date it came back.');
+      await api.reinstateVehicle({ id: v.id, date: x.date, notes: x.notes });
+      toast('Vehicle is back in the fleet.'); done();
+    },
+  });
+}
+
 export function disposeModal(v) {
   const specs = [
     { name: 'disposed_date', label: 'Date disposed of', type: 'date', required: true, max: todayStr() },
@@ -198,7 +218,7 @@ const TABS = [
 
 export async function vehicleDetail(main, { id }, query) {
   mount(main, loadingHtml());
-  const [v, garages] = await Promise.all([api.getVehicle(id), api.listGarages()]);
+  const [v, garages, periods] = await Promise.all([api.getVehicle(id), api.listGarages(), api.listVehiclePeriods(id)]);
   if (!v) { mount(main, emptyHtml('Vehicle not found', 'It may have been removed.', html`<p><a class="btn" href="#/vehicles">Back to vehicles</a></p>`)); return; }
   const tab = TABS.find((t) => t.id === query.tab && (!t.when || t.when())) ? query.tab : 'overview';
   const disposed = v.status === 'disposed';
@@ -216,9 +236,10 @@ export async function vehicleDetail(main, { id }, query) {
   mount(main, html`
     <header class="page-head head-vehicle">
       <div><p class="crumb"><a href="#/vehicles">Vehicles</a></p><h1>${plate(v.registration, v.category)}</h1><p class="rag-line" id="rag-line"></p><p class="sub">${vehicleTitle(v)}${v.nickname ? ` (${v.nickname})` : ''}${v.status !== 'active' ? html` <span class="tag">${VEHICLE_STATUS_LABEL[v.status]}</span>` : ''}${v.archived_at ? html` <span class="tag">Archived</span>` : ''}</p></div>
-      ${can.write ? html`<div class="head-actions"><a class="btn" href="#/vehicles/${v.id}/edit">Edit</a>${!disposed && !v.archived_at && ['available', 'booked'].includes(av.key) ? html`<button class="btn" data-action="out-of-service">Out of service</button>` : ''}${!disposed && !v.archived_at ? html`<button class="btn" data-action="dispose">Dispose</button>` : ''}${v.archived_at ? html`<button class="btn" data-action="restore">Restore</button>` : html`<button class="btn" data-action="archive">Archive</button>`}</div>` : ''}
+      ${can.write ? html`<div class="head-actions"><a class="btn" href="#/vehicles/${v.id}/edit">Edit</a>${!disposed && !v.archived_at && ['available', 'booked'].includes(av.key) ? html`<button class="btn" data-action="out-of-service">Out of service</button>` : ''}${!disposed && !v.archived_at ? html`<button class="btn" data-action="dispose">Dispose</button>` : ''}${disposed && !v.archived_at ? html`<button class="btn btn-primary" data-action="reinstate">Bring back into the fleet</button>` : ''}${v.archived_at ? html`<button class="btn" data-action="restore">Restore</button>` : html`<button class="btn" data-action="archive">Archive</button>`}</div>` : ''}
     </header>
     ${disposed ? html`<p class="banner-info">Disposed of on ${fmtDate(v.disposed_date)} (${DISPOSAL_REASON_LABEL[v.disposal_reason] || v.disposal_reason}).${v.sold_to ? ` Sold to ${v.sold_to}${v.sale_price != null ? ` for ${fmtMoney(v.sale_price)}` : ''}.` : ''} Its records and history stay available.</p>` : ''}
+    ${periods.length > 1 ? html`<p class="periods-line"><strong>In the fleet:</strong> ${periods.map((p, i) => html`${i ? '; ' : ''}${p.start_date ? fmtDateShort(p.start_date) : 'start not recorded'} to ${p.end_date ? html`${fmtDateShort(p.end_date)}${p.disposal_reason ? ` (${(DISPOSAL_REASON_LABEL[p.disposal_reason] || p.disposal_reason).toLowerCase()})` : ''}` : 'now'}`)}</p>` : ''}
     ${availBanner}
     ${v.archived_at ? html`<p class="banner-warn">This vehicle is archived: it is hidden from lists and tasks. Restore it to bring it back.</p>` : ''}
     <nav class="tabs" aria-label="Vehicle sections">${TABS.filter((t) => !t.when || t.when()).map((t) => html`<a class="tab" href="#/vehicles/${v.id}?tab=${t.id}" ${t.id === tab ? html`aria-current="page"` : ''}>${t.label}</a>`)}</nav>
@@ -233,6 +254,7 @@ export async function vehicleDetail(main, { id }, query) {
     'to-sorn': () => convertToOffRoadModal(v.unavailable_event_id, { onDone: again }),
     sorn: () => sornDeclaredModal(v.unavailable_event_id, { onDone: again }),
     dispose: () => disposeModal(v),
+    reinstate: () => reinstateModal(v, again),
     restore: async () => { await api.restoreVehicle(v.id); toast('Vehicle restored.'); navigate(`#/vehicles/${v.id}`); },
     archive: () => openModal({
       title: `Archive ${formatReg(v.registration)}?`, submitLabel: 'Archive vehicle', danger: true,
@@ -261,7 +283,7 @@ const TAB_RENDER = {
         ['Type', CATEGORY_LABEL[v.category]], ['Make and model', [v.make, v.model].filter(Boolean).join(' ')], ['Body', v.body_type], ['Colour', v.colour],
         ['Depot', depots.find((d) => d.id === v.depot_id)?.name], ['VIN', v.vin], ['First registered', fmtDateShort(v.first_registered_date)], ['Year', v.year_of_manufacture], ['Fuel', FUEL_LABEL[v.fuel_type]],
         ['Gross weight', v.gross_weight_kg ? `${fmtInt(v.gross_weight_kg)} kg` : ''], ['Allowable payload', v.payload_kg ? `${fmtInt(v.payload_kg)} kg` : ''],
-        ['Seats', v.seats], ['Fuel economy', v.mpg ? `${v.mpg} mpg` : ''], ['Fleet number', v.fleet_number]])}</section>
+        ['Seats', v.seats], ['Fuel economy', v.mpg ? `${v.mpg} ${v.fuel_type === 'electric' ? 'miles per kWh' : 'mpg'}` : ''], ['Fleet number', v.fleet_number]])}</section>
       <section><h2>Use and cost</h2>${facts([
         ['Primary driver', driver ? html`<a href="#/drivers/${driver.id}">${driverName(driver)}</a>` : (v.status === 'active' ? 'Unassigned' : '')],
         ['Insurance', v.insured_until ? `Covered until ${fmtDateShort(v.insured_until)}` : (v.status === 'active' ? html`<span class="c-overdue"><strong>No current cover</strong></span>` : '')],
@@ -421,11 +443,12 @@ const TAB_RENDER = {
   },
 
   async costs(body, v) {
+    const tcoLink = html`<p class="tco-link"><a href="#/costs/${v.id}">Total cost of ownership for this vehicle</a>: these costs plus fuel, insurance, finance and incidents, month by month.</p>`;
     let rows = await api.listCosts(v.id);
     const draw = () => {
       const total = rows.reduce((s, r) => s + Number(r.amount), 0);
       const byCat = Object.entries(rows.reduce((m, r) => ({ ...m, [r.category]: (m[r.category] || 0) + Number(r.amount) }), {}));
-      mount(body, html`${can.write ? html`<p><button class="btn btn-primary" data-action="add">Add cost</button></p>` : ''}
+      mount(body, html`${can.write ? html`<p><button class="btn btn-primary" data-action="add">Add cost</button></p>` : ''}${tcoLink}
         ${rows.length ? html`<p class="summary">Total logged: <strong>${fmtMoney(total)}</strong> <span class="muted">${byCat.map(([c, a]) => `${COST_CATEGORY_LABEL[c]} ${fmtMoney(a)}`).join(', ')}</span></p>
           <table class="grid"><thead><tr><th>Date</th><th>Type</th><th class="num">Amount</th><th>Invoice</th><th>Note</th></tr></thead><tbody>${rows.map((r) => html`<tr>
             <td data-label="Date">${fmtDateShort(r.cost_date)}</td><td data-label="Type">${COST_CATEGORY_LABEL[r.category]}</td><td data-label="Amount" class="num">${fmtMoney(r.amount)}</td>

@@ -12,6 +12,7 @@ const NAV = [
   { id: 'incidents', label: 'Incidents', href: '#/incidents' },
   { id: 'garages', label: 'Garages', href: '#/garages' },
   { id: 'insurance', label: 'Insurance', href: '#/insurance' },
+  { id: 'costs', label: 'Costs', href: '#/costs' },
   { id: 'reports', label: 'Reports', href: '#/reports' },
   { id: 'audit', label: 'Audit log', href: '#/audit', when: () => can.audit },
   { id: 'settings', label: 'Settings', href: '#/settings', when: () => can.configure },

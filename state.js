@@ -20,12 +20,15 @@ export const ACCESS_SUMMARY = [
   ['Dashboard, planner, tasks and reports', ['View', 'View', 'View', 'View']],
   ['Vehicles, drivers, incidents, insurance and garages', ['Full', 'Full', 'Full', 'View']],
   ['Garage visits, mileage, costs and compliance dates', ['Full', 'Full', 'Full', 'View']],
+  ['Leaving and returning: dispose of or bring back a vehicle, record a leaver or rehire a driver', ['Full', 'Full', 'Full', 'None']],
+  ['Total cost of ownership', ['View', 'View', 'View', 'View']],
+  ['Monthly fuel prices', ['Full', 'Full', 'Full', 'View']],
   ['Acting on tasks and sending task emails', ['Full', 'Full', 'Full', 'None']],
   ['Driver licence details, licence checks, points and convictions', ['Full', 'Full', 'Full', 'None']],
   ['Documents (open and upload)', ['Full', 'Full', 'Full', 'None']],
   ['Override a block on a driver whose licence is not valid', ['Full', 'Full', 'None', 'None']],
   ['Audit log', ['View', 'View', 'None', 'None']],
-  ['Settings: vehicles needed, depots, users, date format', ['Full', 'None', 'None', 'None']],
+  ['Settings: vehicles needed, depots, users, date format, typical fuel economy', ['Full', 'None', 'None', 'None']],
 ];
 export const MEMBER_STATUS_LABEL = { active: 'Active', disabled: 'Suspended', removed: 'Removed' };
 

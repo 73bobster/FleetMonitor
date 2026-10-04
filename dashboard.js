@@ -16,9 +16,9 @@ export async function dashboardView(main) {
   const p = loadPeriod();
   // everything in one round trip: the period's costs and mileage are fetched alongside the rest
   const fetchPeriod = (per) => Promise.all([api.listCostsBetween(per), api.milesInPeriod(per)]);
-  const [tasks, vehicles, drivers, incidents, events, garages, convictions, first, needs, ragInputs] = await Promise.all([
+  const [tasks, vehicles, drivers, incidents, events, garages, convictions, first, needs, ragInputs, periods] = await Promise.all([
     api.listTasks(), api.listVehicles(), api.listDrivers(), api.listIncidents(), api.listUnavailability(), api.listGarages(),
-    can.sensitive ? api.listConvictions() : [], fetchPeriod(p), api.listVehicleRequirements(), api.ragInputs(),
+    can.sensitive ? api.listConvictions() : [], fetchPeriod(p), api.listVehicleRequirements(), api.ragInputs(), api.listVehiclePeriods(),
   ]);
   let [costs, mileRowsRaw] = first;
   const today = todayStr();
@@ -97,7 +97,7 @@ export async function dashboardView(main) {
     }).sort((x, y) => (can.sensitive ? y.points - x.points : 0) || y.combined - x.combined || driverName(x.d).localeCompare(driverName(y.d)));
     const offenders = rows.filter((r) => (can.sensitive && (r.points || r.totting)) || r.combined);
     const shown = offenders.slice(0, DRIVERS_SHOWN);
-    const series = buildAvailabilitySeries(vehicles, liveEvents, p, today);
+    const series = buildAvailabilitySeries(vehicles, liveEvents, p, today, periods);
     const t = series.totals;
 
     const fig = (label, value, sub, href, tone = '') => html`<a class="figure ${tone}" href="${href}"><span class="figure-value">${value}</span><span class="figure-label">${label}</span>${sub ? html`<span class="figure-sub">${sub}</span>` : ''}</a>`;

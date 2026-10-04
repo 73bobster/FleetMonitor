@@ -2,6 +2,7 @@
 // Every query is scoped to the current organisation. Row-level security is the real guard;
 // the filter is there so a person who belongs to several organisations only sees the one they chose.
 import { state } from './state.js';
+import { formatDate } from './ui.js';
 
 let sb = null;
 export const init = (client) => { sb = client; };
@@ -9,8 +10,11 @@ export const client = () => sb;
 const org = () => state.org.id;
 
 // ---- Errors -------------------------------------------------------------
+// Messages raised by the database carry dates as "21 Sep 2026". Show them in the organisation's own date format.
+const DB_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const ownDates = (msg) => msg.replace(/\b(\d{2}) (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) (\d{4})\b/g, (m, d, mon, y) => formatDate(new Date(Number(y), DB_MONTHS.indexOf(mon), Number(d))));
 export function friendly(err) {
-  const msg = err?.message || String(err);
+  const msg = ownDates(err?.message || String(err));
   if (/row-level security|permission denied/i.test(msg)) return "You don't have permission to do that.";
   if (/at least one active superuser/i.test(msg)) return 'There must always be at least one active superuser. Make someone else a superuser first.';
   if (err?.code === '23505') {
@@ -153,6 +157,32 @@ export async function saveOrgSettings(patch) {
   state.org.settings = row.settings;
   return row;
 }
+
+// ---- Periods in the fleet, and bringing a disposed vehicle back ----
+// Each spell a vehicle spends in the fleet: { vehicle_id, start_date, end_date, disposal_reason, sale_price, sold_to, notes }.
+export const listVehiclePeriods = async (vehicleId) =>
+  all(() => {
+    let q = sb.from('vehicle_periods').select('*').eq('organisation_id', org());
+    if (vehicleId) q = q.eq('vehicle_id', vehicleId);
+    return q.order('start_date', { ascending: true, nullsFirst: true }).order('id');
+  });
+export const reinstateVehicle = async ({ id, date, notes }) =>
+  ok(await sb.rpc('reinstate_vehicle', { p_vehicle_id: id, p_date: date, p_notes: notes ?? null }));
+
+// ---- Total cost of ownership ----
+// Everything the sums need, fleet-wide. Costs and readings can be long lists, so they are read a page at a time.
+export const listAllCosts = async () =>
+  all(() => sb.from('vehicle_costs').select('id, vehicle_id, category, cost_date, amount').eq('organisation_id', org()).order('cost_date').order('id'));
+export const listAllReadings = async () =>
+  all(() => sb.from('odometer_readings').select('id, vehicle_id, reading_date, mileage').eq('organisation_id', org()).order('reading_date').order('id'));
+export const listAllPolicyVehicles = async () =>
+  all(() => sb.from('policy_vehicles').select('*').eq('organisation_id', org()).order('id'));
+// Fuel price by month and fuel type: pence per litre (petrol, diesel) or pence per kWh (electric).
+export const listFuelPrices = async () =>
+  all(() => sb.from('fuel_prices').select('*').eq('organisation_id', org()).order('month', { ascending: false }).order('fuel_type'));
+// Saving a price makes it the organisation's own figure, replacing any national average for that month.
+export const saveFuelPrice = async ({ month, fuel_type, price }) =>
+  ok(await sb.from('fuel_prices').upsert({ organisation_id: org(), month, fuel_type, price, source: 'manual' }, { onConflict: 'organisation_id,month,fuel_type' }).select().single());
 
 // The part of the red/amber/green status that the database works out, because it depends on licence and points data
 // that not every role may read: { drivers: [{ driver_id, level, reasons }], hidden_tasks: { ... } | null }. See rag.js.

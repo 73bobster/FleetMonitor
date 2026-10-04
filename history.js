@@ -1,14 +1,14 @@
 // Turns audit-log entries into plain sentences. Used by the History tabs and the Audit log screen.
 import * as api from './api.js';
 import { ROLE_LABEL, MEMBER_STATUS_LABEL } from './state.js';
-import { html, plate, fmtDateTime, fmtDateShort, fmtMoney } from './ui.js';
+import { html, plate, fmtDateTime, fmtDateShort, fmtMonth, fmtMoney } from './ui.js';
 import { driverName, CATEGORY_NOUN, INCIDENT_KIND_LABEL, FINE_TYPE_LABEL, LEAVING_REASON_LABEL, DISPOSAL_REASON_LABEL, LICENCE_STATUS_LABEL } from './domain.js';
 
 export const TABLE_LABEL = {
   vehicles: 'Vehicle', drivers: 'Driver', driver_sensitive: 'Driver licence details', licence_checks: 'Licence check', vehicle_assignments: 'Driver assignment',
   compliance_items: 'Compliance item', compliance_renewals: 'Renewal', compliance_types: 'Compliance type', task_states: 'Task', insurance_policies: 'Insurance policy',
   policy_vehicles: 'Insurance cover', insurance_claims: 'Claim', incidents: 'Incident', driver_convictions: 'Conviction', driver_periods: 'Employment', documents: 'Document',
-  vehicle_costs: 'Cost', garages: 'Garage', vehicle_unavailability: 'Garage visit or time off the road', depots: 'Depot', vehicle_requirements: 'Vehicles needed', contacts: 'Contact', organisations: 'Organisation settings', memberships: 'User access', invitations: 'Invitation',
+  vehicle_costs: 'Cost', vehicle_periods: 'Period in the fleet', fuel_prices: 'Fuel price', garages: 'Garage', vehicle_unavailability: 'Garage visit or time off the road', depots: 'Depot', vehicle_requirements: 'Vehicles needed', contacts: 'Contact', organisations: 'Organisation settings', memberships: 'User access', invitations: 'Invitation',
   support_grants: 'Support access', message_templates: 'Message template', odometer_readings: 'Mileage reading', external_links: 'External link', integration_connections: 'Integration',
 };
 const FIELD = { mobile_work: 'work mobile', mobile_personal: 'personal mobile', company_phone: 'company phone', gross_weight_kg: 'gross weight', payload_kg: 'payload', licence_number: 'licence number', date_of_birth: 'date of birth' };
@@ -28,6 +28,7 @@ export function recordLink(e) {
   if (e.table_name === 'insurance_policies') return [`#/insurance/${e.record_id}`, 'Open the policy'];
   if (['policy_vehicles', 'insurance_claims'].includes(e.table_name) && row.policy_id) return [`#/insurance/${row.policy_id}`, 'Open the policy'];
   if (e.table_name === 'garages') return ['#/garages', 'Open garages'];
+  if (e.table_name === 'fuel_prices') return ['#/costs?tab=fuel', 'Open fuel prices'];
   if (SETTINGS_TABLES.includes(e.table_name)) return ['#/settings', 'Open settings'];
   return null;
 }
@@ -107,11 +108,22 @@ function describe(e, L) {
     case 'odometer_readings':
       if (e.action === 'INSERT') return html`logged a mileage reading of ${n.mileage}`;
       break;
+    case 'vehicle_periods':
+      if (e.action === 'INSERT') return html`in the fleet from ${n.start_date ? fmtDateShort(n.start_date) : 'a date not recorded'}${n.end_date ? ` to ${fmtDateShort(n.end_date)}` : ''}${n.notes ? ` (${n.notes})` : ''}`;
+      if (changed(e, 'end_date') && n.end_date) return html`left the fleet on ${fmtDateShort(n.end_date)}`;
+      if (changed(e, 'start_date')) return html`start of its time in the fleet changed to ${n.start_date ? fmtDateShort(n.start_date) : 'not recorded'}`;
+      break;
+    case 'fuel_prices': {
+      const what = `${row.fuel_type} price for ${fmtMonth(row.month, true)}`;
+      if (e.action === 'DELETE') return html`removed the ${what}`;
+      return html`set the ${what} to ${Number(n.price).toFixed(1)}p`;
+    }
     case 'organisations':
       if (changed(e, 'settings')) {
         const was = o.settings || {}; const now = n.settings || {};
         const keys = Object.keys(now).filter((k) => JSON.stringify(now[k]) !== JSON.stringify(was[k]));
-        return html`changed settings: ${keys.map((k) => `${k.replace(/_/g, ' ')} to ${now[k]}`).join(', ') || 'no visible change'}`;
+        const show = (x) => (x && typeof x === 'object' ? Object.entries(x).map(([a, b]) => `${a.replace(/_/g, ' ')} ${b}`).join(', ') : x);
+        return html`changed settings: ${keys.map((k) => `${k.replace(/_/g, ' ')} to ${show(now[k])}`).join('; ') || 'no visible change'}`;
       }
       break;
     case 'memberships': {
@@ -138,7 +150,7 @@ function describe(e, L) {
 }
 
 // Detail chips for a plain update that has no special sentence.
-const needsChips = (e) => e.action === 'UPDATE' && !(['memberships', 'invitations'].includes(e.table_name) || (e.table_name === 'organisations' && changed(e, 'settings')) || (e.table_name === 'compliance_items' && changed(e, 'due_date')) || (e.table_name === 'vehicles' && (changed(e, 'archived_at') || (changed(e, 'status') && e.new_data?.status === 'disposed'))) || e.table_name === 'task_states' || (e.table_name === 'incidents' && (changed(e, 'insurer_notified_on') || changed(e, 'paid_on') || changed(e, 'nominated_on'))) || (e.table_name === 'driver_convictions' && (changed(e, 'insurer_notified_on') || changed(e, 'status'))) || (e.table_name === 'driver_periods' && changed(e, 'end_date')) || (e.table_name === 'policy_vehicles' && changed(e, 'end_date')) || (e.table_name === 'vehicle_assignments' && changed(e, 'end_date')) || (e.table_name === 'documents' && changed(e, 'archived_at')));
+const needsChips = (e) => e.action === 'UPDATE' && !(['memberships', 'invitations', 'fuel_prices', 'vehicle_periods'].includes(e.table_name) || (e.table_name === 'organisations' && changed(e, 'settings')) || (e.table_name === 'compliance_items' && changed(e, 'due_date')) || (e.table_name === 'vehicles' && (changed(e, 'archived_at') || (changed(e, 'status') && e.new_data?.status === 'disposed'))) || e.table_name === 'task_states' || (e.table_name === 'incidents' && (changed(e, 'insurer_notified_on') || changed(e, 'paid_on') || changed(e, 'nominated_on'))) || (e.table_name === 'driver_convictions' && (changed(e, 'insurer_notified_on') || changed(e, 'status'))) || (e.table_name === 'driver_periods' && changed(e, 'end_date')) || (e.table_name === 'policy_vehicles' && changed(e, 'end_date')) || (e.table_name === 'vehicle_assignments' && changed(e, 'end_date')) || (e.table_name === 'documents' && changed(e, 'archived_at')));
 
 export function historyList(entries, L, { subject = false } = {}) {
   if (!entries.length) return html`<p class="muted">No changes recorded for this selection.</p>`;

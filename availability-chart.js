@@ -18,10 +18,19 @@ export function eventCoversDay(e, day, today) {
 
 const mondayOf = (day) => addDaysISO(day, -((parseISO(day).getDay() + 6) % 7));
 
-export function buildAvailabilitySeries(vehicles, events, p, today = todayStr()) {
+// periods (optional) is the list of vehicle_periods rows. With it, a vehicle that left the fleet and came back is only
+// counted for the days it was in the fleet; without it, the vehicle's acquired and disposed dates are used.
+export function buildAvailabilitySeries(vehicles, events, p, today = todayStr(), periods = null) {
   const fleet = vehicles.filter((v) => !v.archived_at);
   const byVehicle = new Map();
   for (const e of events) { if (e.cancelled_at) continue; if (!byVehicle.has(e.vehicle_id)) byVehicle.set(e.vehicle_id, []); byVehicle.get(e.vehicle_id).push(e); }
+  const periodsBy = new Map();
+  for (const x of periods || []) { if (!periodsBy.has(x.vehicle_id)) periodsBy.set(x.vehicle_id, []); periodsBy.get(x.vehicle_id).push(x); }
+  const inFleet = (v, day) => {
+    const ps = periodsBy.get(v.id);
+    if (ps) return ps.some((x) => (!x.start_date || x.start_date <= day) && (!x.end_date || x.end_date > day));   // the day it goes, it is gone
+    return !(v.date_acquired && v.date_acquired > day) && !(v.disposed_date && v.disposed_date <= day);
+  };
   const n = Math.min(daysInPeriod(p), 3700);
   const unit = n <= 31 ? 'day' : n <= 140 ? 'week' : 'month';
   const keyOf = (day) => (unit === 'day' ? day : unit === 'week' ? mondayOf(day) : day.slice(0, 7));
@@ -31,8 +40,7 @@ export function buildAvailabilitySeries(vehicles, events, p, today = todayStr())
     const day = addDaysISO(p.from, i);
     const c = { availVan: 0, availHgv: 0, unavVan: 0, unavHgv: 0 };
     for (const v of fleet) {
-      if (v.date_acquired && v.date_acquired > day) continue;     // not in the fleet yet
-      if (v.disposed_date && v.disposed_date <= day) continue;     // already gone
+      if (!inFleet(v, day)) continue;     // not in the fleet yet, or already gone
       const out = (byVehicle.get(v.id) || []).some((e) => eventCoversDay(e, day, today));
       c[`${out ? 'unav' : 'avail'}${groupOf(v) === 'hgv' ? 'Hgv' : 'Van'}`] += 1;
     }
