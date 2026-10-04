@@ -15,6 +15,8 @@ export const CATEGORY_PLURAL = { car: 'Cars', van: 'Vans', light_goods: 'Light g
 export const CATEGORY_NOUN = { car: ['car', 'cars'], van: ['van', 'vans'], light_goods: ['light goods vehicle', 'light goods vehicles'], hgv: ['HGV', 'HGVs'], bus: ['bus', 'buses'], trailer: ['trailer', 'trailers'], plant: ['plant item', 'plant items'], other: ['other vehicle', 'other vehicles'] };
 // Days of the week, Monday first: the column in vehicle_requirements, the short name and the full name.
 export const WEEKDAYS = [['mon', 'Mon', 'Monday'], ['tue', 'Tue', 'Tuesday'], ['wed', 'Wed', 'Wednesday'], ['thu', 'Thu', 'Thursday'], ['fri', 'Fri', 'Friday'], ['sat', 'Sat', 'Saturday'], ['sun', 'Sun', 'Sunday']];
+// Due dates that need the vehicle at a garage, and the kinds of garage visit that deal with each.
+export const BOOKABLE = { SERVICE: ['servicing'], MOT: ['mot'], ANNUAL_TEST: ['mot'], PMI: ['servicing', 'other_garage'], TACHO_CALIBRATION: ['tacho'], TAIL_LIFT_LOLER: ['tail_lift'] };
 export const FUEL_LABEL = { petrol: 'Petrol', diesel: 'Diesel', electric: 'Electric', hybrid: 'Hybrid', plug_in_hybrid: 'Plug-in hybrid', gas: 'Gas', hydrogen: 'Hydrogen', other: 'Other' };
 export const OWNERSHIP_LABEL = { owned: 'Owned', leased: 'Leased', financed: 'Financed', hired: 'Rented' };
 export const VEHICLE_STATUS_LABEL = { active: 'Active', off_road: 'Off the road', disposed: 'Disposed' };

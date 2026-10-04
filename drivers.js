@@ -16,6 +16,7 @@ import { navigate } from './router.js';
 import { historyList, auditLookups } from './history.js';
 import { incidentTable } from './incidents.js';
 import { mountDocuments } from './docs.js';
+import { driverRag, ragDot, ragLine } from './rag.js';
 
 const opts = (o) => Object.entries(o);
 const licenceClass = (s) => (s === 'valid' ? 'upcoming' : BLOCKING_LICENCE.includes(s) ? 'overdue' : 'due_soon');
@@ -25,28 +26,32 @@ const maskLicence = (n) => (n ? `${n.slice(0, 5)}${'•'.repeat(Math.max(0, n.le
 const livePoints = (cs, today) => cs.filter((c) => c.status === 'live' && c.points > 0 && c.licence_until >= today).reduce((s, c) => s + c.points, 0);
 
 // ---- List ------------------------------------------------------------------
-export async function driversList(main) {
+export async function driversList(main, query = {}) {
   mount(main, html`<header class="page-head"><h1>Drivers</h1></header>${loadingHtml('Loading drivers')}`);
-  const [drivers, tasks, depots, vehicles, assigns, licences, convictions] = await Promise.all([
+  const [drivers, tasks, depots, vehicles, assigns, licences, convictions, incidents, ragInputs] = await Promise.all([
     api.listDrivers(), api.listTasks(), api.listAllDepots(), api.listVehicles(), api.listAssignments({}), api.currentLicences(), can.sensitive ? api.listConvictions() : [],
+    api.listIncidents(), api.ragInputs(),
   ]);
+  const ragDb = new Map((ragInputs?.drivers || []).map((x) => [x.driver_id, x]));
+  const ragOf = new Map(drivers.map((d) => [d.id, driverRag(d, tasks, incidents, ragDb.get(d.id))]));   // red, amber or green for each driver
   const depotById = new Map(depots.map((d) => [d.id, d]));
   const vehicleById = new Map(vehicles.map((v) => [v.id, v]));
   const licBy = new Map(licences.map((l) => [l.driver_id, l]));
   const today = todayStr();
-  const ui = { q: '', depot: '', former: false };
+  const ui = { q: '', depot: '', former: false, rag: query.rag === '1' };
   mount(main, html`
     <header class="page-head"><h1>Drivers</h1>${can.write ? html`<a class="btn btn-primary" href="#/drivers/new">Add driver</a>` : ''}</header>
     <div class="filters">
       <input type="search" id="d-search" placeholder="Search name or employee number" aria-label="Search drivers">
       ${depots.length ? html`<label class="inline"><span class="sr-only">Depot</span><select id="d-depot"><option value="">All depots</option>${depots.filter((d) => !d.archived_at).map((d) => html`<option value="${d.id}">${d.name}</option>`)}</select></label>` : ''}
+      <label class="check small"><input type="checkbox" id="d-rag" ${ui.rag ? 'checked' : ''}> <span>Red and amber only</span></label>
       <label class="check small"><input type="checkbox" id="d-former"> <span>Include former drivers</span></label>
     </div>
     <div id="d-table"></div>`);
   const box = main.querySelector('#d-table');
   function draw() {
     const rows = drivers.filter((d) =>
-      (ui.former || d.employment_status === 'active') && (!ui.depot || d.depot_id === ui.depot) &&
+      (ui.former || d.employment_status === 'active') && (!ui.depot || d.depot_id === ui.depot) && (!ui.rag || ['red', 'amber'].includes(ragOf.get(d.id).level)) &&
       (!ui.q || [driverName(d), d.employee_number].join(' ').toLowerCase().includes(ui.q)));
     if (!drivers.length) { mount(box, emptyHtml('No drivers yet', 'Add your drivers to track licence checks and assign them to vehicles.', can.write ? html`<p><a class="btn btn-primary" href="#/drivers/new">Add a driver</a></p>` : '')); return; }
     if (!rows.length) { mount(box, emptyHtml('No drivers match', 'Try a different filter, or tick Include former drivers.')); return; }
@@ -58,7 +63,7 @@ export async function driversList(main) {
       const mine = assigns.filter((a) => a.driver_id === d.id && !a.end_date).map((a) => vehicleById.get(a.vehicle_id)).filter(Boolean);
       const former = d.employment_status !== 'active';
       return html`<tr>
-        <td data-label="Driver"><a href="#/drivers/${d.id}"><strong>${driverName(d)}</strong></a><div class="sub">${d.job_title || ''}${former ? html` <span class="tag">Left ${fmtDateShort(d.end_date)}</span>` : ''}</div></td>
+        <td data-label="Driver"><span class="with-rag">${ragDot(ragOf.get(d.id))}<a href="#/drivers/${d.id}"><strong>${driverName(d)}</strong></a></span><div class="sub">${d.job_title || ''}${former ? html` <span class="tag">Left ${fmtDateShort(d.end_date)}</span>` : ''}</div></td>
         <td data-label="Depot">${depotById.get(d.depot_id)?.name || ''}</td>
         <td data-label="Vehicle">${mine.length ? mine.map((v) => html`<a class="plate-link" href="#/vehicles/${v.id}">${plate(v.registration, v.category)}</a> `) : html`<span class="muted">None</span>`}</td>
         <td data-label="Work mobile">${d.mobile_work || ''}${d.company_phone ? html`<div class="sub">Company phone</div>` : ''}</td>
@@ -69,6 +74,7 @@ export async function driversList(main) {
   main.querySelector('#d-search').addEventListener('input', (e) => { ui.q = e.target.value.trim().toLowerCase(); draw(); });
   main.querySelector('#d-depot')?.addEventListener('change', (e) => { ui.depot = e.target.value; draw(); });
   main.querySelector('#d-former').addEventListener('change', (e) => { ui.former = e.target.checked; draw(); });
+  main.querySelector('#d-rag').addEventListener('change', (e) => { ui.rag = e.target.checked; draw(); });
   draw();
 }
 
@@ -155,11 +161,15 @@ export async function driverDetail(main, { id }, query) {
   const open = periods.find((p) => !p.end_date);
   mount(main, html`
     <header class="page-head">
-      <div><p class="crumb"><a href="#/drivers">Drivers</a></p><h1>${driverName(d)}</h1><p class="sub">${d.job_title || ''}${open ? '' : html` <span class="tag">Left ${fmtDateShort(d.end_date)}</span>`}</p></div>
+      <div><p class="crumb"><a href="#/drivers">Drivers</a></p><h1>${driverName(d)}</h1><p class="rag-line" id="rag-line"></p><p class="sub">${d.job_title || ''}${open ? '' : html` <span class="tag">Left ${fmtDateShort(d.end_date)}</span>`}</p></div>
       ${can.write ? html`<div class="head-actions"><a class="btn" href="#/drivers/${d.id}/edit">Edit</a>${open ? html`<button class="btn" data-action="leave">Record leaver</button>` : html`<button class="btn btn-primary" data-action="rehire">Rehire</button>`}</div>` : ''}
     </header>
     <nav class="tabs" aria-label="Driver sections">${TABS.filter((t) => !t.when || t.when()).map((t) => html`<a class="tab" href="#/drivers/${d.id}?tab=${t.id}" ${t.id === tab ? html`aria-current="page"` : ''}>${t.label}</a>`)}</nav>
     <div id="tab-body">${loadingHtml()}</div>`);
+  // the status line is filled in once its data has arrived, without holding up the rest of the screen
+  Promise.all([api.listTasks({ driverId: d.id }), api.listIncidents({ driverId: d.id }), api.ragInputs()])
+    .then(([ts, incs, ri]) => { const el = main.querySelector('#rag-line'); if (el) mount(el, ragLine(driverRag(d, ts, incs, (ri?.drivers || []).find((x) => x.driver_id === d.id)))); })
+    .catch((e) => console.error(e));
   const again = () => navigate(`#/drivers/${d.id}${query.tab ? `?tab=${query.tab}` : ''}`);
   on(main, { leave: () => leaveModal(d, again), rehire: () => rehireModal(d, periods, again) });
   const body = main.querySelector('#tab-body');

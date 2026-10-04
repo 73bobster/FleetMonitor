@@ -4,12 +4,11 @@
 import * as api from './api.js';
 import { can } from './state.js';
 import { html, mount, plate, formatReg, loadingHtml, fmtDate, fmtDateShort, fmtDayMonth, fmtMonth, todayStr, addDaysISO, parseISO } from './ui.js';
-import { CATEGORY_LABEL, UNAVAIL_REASON_LABEL, WEEKDAYS, CATEGORY_PLURAL, CATEGORY_NOUN } from './domain.js';
+import { CATEGORY_LABEL, UNAVAIL_REASON_LABEL, WEEKDAYS, CATEGORY_PLURAL, CATEGORY_NOUN, BOOKABLE } from './domain.js';
+import { vehicleRag, ragDot } from './rag.js';
 
 // Short labels for the blocks in the grid.
 const REASON_CODE = { servicing: 'Svc', mot: 'MOT', tyres: 'Tyr', repair: 'Rep', accident_repair: 'Body', breakdown: 'Bkdn', tacho: 'Tach', tail_lift: 'Lift', other_garage: 'Gar', off_road: 'SORN' };
-// Due dates that need the vehicle at a garage, and the kind of visit that deals with each.
-const BOOKABLE = { SERVICE: ['servicing'], MOT: ['mot'], ANNUAL_TEST: ['mot'], PMI: ['servicing', 'other_garage'], TACHO_CALIBRATION: ['tacho'], TAIL_LIFT_LOLER: ['tail_lift'] };
 // Of those, the ones a vehicle should not be used without. Once the date passes with nothing booked the vehicle is "at risk".
 const RISK_CODES = ['MOT', 'ANNUAL_TEST', 'PMI', 'TACHO_CALIBRATION'];
 const TERM_WORD = { leased: 'Lease', hired: 'Rental', financed: 'Finance' };
@@ -178,7 +177,7 @@ export async function plannerView(main) {
         </thead>
         ${plan.groups.map((g) => html`<tbody>
           <tr class="pl-group"><th class="pl-veh" scope="rowgroup">${CATEGORY_PLURAL[g.category]}</th><td colspan="${plan.days.length}"></td></tr>
-          ${g.rows.map((r) => html`<tr><th class="pl-veh" scope="row"><a class="plate-link" href="#/vehicles/${r.v.id}?tab=availability">${plate(r.v.registration, r.v.category)}</a></th>${r.cells.map((c, i) => cellHtml(r, c, i))}</tr>`)}
+          ${g.rows.map((r) => html`<tr><th class="pl-veh" scope="row">${ragDot(vehicleRag(r.v, tasks, events))}<a class="plate-link" href="#/vehicles/${r.v.id}?tab=availability">${plate(r.v.registration, r.v.category)}</a></th>${r.cells.map((c, i) => cellHtml(r, c, i))}</tr>`)}
           <tr class="pl-count"><th class="pl-veh" scope="row">Available</th>${g.counts.map((c, i) => html`<td class="lvl-${c.level} ${plan.days[i].isToday ? 'is-today' : ''} ${plan.days[i].dow === 0 ? 'wk' : ''}" title="${`${fmtDate(plan.days[i].date)}: ${c.available} available${c.atRisk ? ` (${c.atRisk} at risk)` : ''}, ${c.needed ? `${c.needed} needed` : 'no minimum'}`}">${c.available}</td>`)}</tr>
           <tr class="pl-need"><th class="pl-veh" scope="row">Needed</th>${g.counts.map((c, i) => html`<td class="${plan.days[i].isToday ? 'is-today' : ''} ${plan.days[i].dow === 0 ? 'wk' : ''}">${c.needed || html`<span class="muted">-</span>`}</td>`)}</tr>
         </tbody>`)}

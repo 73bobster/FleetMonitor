@@ -11,6 +11,7 @@ import {
 } from './domain.js';
 import { openTaskPanel } from './actions.js';
 import { navigate } from './router.js';
+import { vehicleRag, ragDot, ragLine } from './rag.js';
 import { historyList, auditLookups } from './history.js';
 import { incidentTable } from './incidents.js';
 import { mountDocuments } from './docs.js';
@@ -19,13 +20,14 @@ import { outOfServiceModal, backInServiceModal, extendReturnModal, convertToOffR
 const opts = (o) => Object.entries(o);
 
 // ---- List ------------------------------------------------------------------
-export async function vehiclesList(main) {
+export async function vehiclesList(main, query = {}) {
   mount(main, html`<header class="page-head"><h1>Vehicles</h1></header>${loadingHtml('Loading vehicles')}`);
-  const [vehicles, tasks, drivers, depots, garages] = await Promise.all([api.listVehicles(), api.listTasks(), api.listDrivers(), api.listAllDepots(), api.listGarages()]);
+  const [vehicles, tasks, drivers, depots, garages, events] = await Promise.all([api.listVehicles(), api.listTasks(), api.listDrivers(), api.listAllDepots(), api.listGarages(), api.listUnavailability()]);
+  const ragOf = new Map(vehicles.map((v) => [v.id, vehicleRag(v, tasks, events)]));   // red, amber or green for each vehicle
   const garageName = (id) => garages.find((g) => g.id === id)?.name || 'a garage';
   const driverById = new Map(drivers.map((d) => [d.id, d]));
   const depotById = new Map(depots.map((d) => [d.id, d]));
-  const ui = { q: '', depot: '', category: '', avail: '', disposed: false, archived: false };
+  const ui = { q: '', depot: '', category: '', avail: '', disposed: false, archived: false, rag: query.rag === '1' };
   const groupOf = (v) => { const k = availability(v).key; return k === 'booked' ? 'available' : (k === 'sorn' || k === 'off_road_no_sorn') ? 'off_road' : k; };
 
   mount(main, html`
@@ -35,6 +37,7 @@ export async function vehiclesList(main) {
       ${depots.length ? html`<label class="inline"><span class="sr-only">Depot</span><select id="v-depot"><option value="">All depots</option>${depots.filter((d) => !d.archived_at).map((d) => html`<option value="${d.id}">${d.name}</option>`)}</select></label>` : ''}
       <label class="inline"><span class="sr-only">Availability</span><select id="v-avail"><option value="">Any availability</option><option value="available">Available</option><option value="garage">At a garage</option><option value="off_road">Off the road</option></select></label>
       <label class="inline"><span class="sr-only">Type</span><select id="v-cat"><option value="">All types</option>${opts(CATEGORY_LABEL).map(([k, l]) => html`<option value="${k}">${l}</option>`)}</select></label>
+      <label class="check small"><input type="checkbox" id="v-rag" ${ui.rag ? 'checked' : ''}> <span>Red and amber only</span></label>
       <label class="check small"><input type="checkbox" id="v-disposed"> <span>Include disposed</span></label>
       <label class="check small"><input type="checkbox" id="v-archived"> <span>Include archived</span></label>
     </div>
@@ -56,7 +59,7 @@ export async function vehiclesList(main) {
 
   function draw() {
     const rows = vehicles.filter((v) =>
-      (ui.disposed || v.status !== 'disposed') && (ui.archived || !v.archived_at) &&
+      (ui.disposed || v.status !== 'disposed') && (ui.archived || !v.archived_at) && (!ui.rag || ['red', 'amber'].includes(ragOf.get(v.id).level)) &&
       (!ui.depot || v.depot_id === ui.depot) && (!ui.category || v.category === ui.category) && (!ui.avail || groupOf(v) === ui.avail) &&
       (!ui.q || [v.registration, v.make, v.model, v.nickname, driverName(driverById.get(v.primary_driver_id))].join(' ').toLowerCase().includes(ui.q)));
     if (!vehicles.length) {
@@ -72,7 +75,7 @@ export async function vehiclesList(main) {
         const overdue = vt.filter((t) => t.status === 'overdue').length;
         const live = v.status === 'active' && !v.archived_at;
         return html`<tr>
-          <td data-label="Vehicle"><a class="plate-link" href="#/vehicles/${v.id}">${plate(v.registration, v.category)}</a>
+          <td data-label="Vehicle"><span class="with-rag">${ragDot(ragOf.get(v.id))}<a class="plate-link" href="#/vehicles/${v.id}">${plate(v.registration, v.category)}</a></span>
             <div class="sub">${vehicleTitle(v)}${v.nickname ? ` (${v.nickname})` : ''}</div></td>
           <td data-label="Availability">${availCell(v)}</td>
           <td data-label="Depot">${depotById.get(v.depot_id)?.name || ''}</td>
@@ -87,6 +90,7 @@ export async function vehiclesList(main) {
   main.querySelector('#v-depot')?.addEventListener('change', (e) => { ui.depot = e.target.value; draw(); });
   main.querySelector('#v-cat').addEventListener('change', (e) => { ui.category = e.target.value; draw(); });
   main.querySelector('#v-avail').addEventListener('change', (e) => { ui.avail = e.target.value; draw(); });
+  main.querySelector('#v-rag').addEventListener('change', (e) => { ui.rag = e.target.checked; draw(); });
   main.querySelector('#v-disposed').addEventListener('change', (e) => { ui.disposed = e.target.checked; draw(); });
   main.querySelector('#v-archived').addEventListener('change', (e) => { ui.archived = e.target.checked; draw(); });
   draw();
@@ -211,7 +215,7 @@ export async function vehicleDetail(main, { id }, query) {
     : av.key === 'booked' ? html`<div class="banner-info"><p>Booked in on ${fmtDate(v.next_booking_date)}. See the Availability tab for the details.</p></div>` : '';
   mount(main, html`
     <header class="page-head head-vehicle">
-      <div><p class="crumb"><a href="#/vehicles">Vehicles</a></p><h1>${plate(v.registration, v.category)}</h1><p class="sub">${vehicleTitle(v)}${v.nickname ? ` (${v.nickname})` : ''}${v.status !== 'active' ? html` <span class="tag">${VEHICLE_STATUS_LABEL[v.status]}</span>` : ''}${v.archived_at ? html` <span class="tag">Archived</span>` : ''}</p></div>
+      <div><p class="crumb"><a href="#/vehicles">Vehicles</a></p><h1>${plate(v.registration, v.category)}</h1><p class="rag-line" id="rag-line"></p><p class="sub">${vehicleTitle(v)}${v.nickname ? ` (${v.nickname})` : ''}${v.status !== 'active' ? html` <span class="tag">${VEHICLE_STATUS_LABEL[v.status]}</span>` : ''}${v.archived_at ? html` <span class="tag">Archived</span>` : ''}</p></div>
       ${can.write ? html`<div class="head-actions"><a class="btn" href="#/vehicles/${v.id}/edit">Edit</a>${!disposed && !v.archived_at && ['available', 'booked'].includes(av.key) ? html`<button class="btn" data-action="out-of-service">Out of service</button>` : ''}${!disposed && !v.archived_at ? html`<button class="btn" data-action="dispose">Dispose</button>` : ''}${v.archived_at ? html`<button class="btn" data-action="restore">Restore</button>` : html`<button class="btn" data-action="archive">Archive</button>`}</div>` : ''}
     </header>
     ${disposed ? html`<p class="banner-info">Disposed of on ${fmtDate(v.disposed_date)} (${DISPOSAL_REASON_LABEL[v.disposal_reason] || v.disposal_reason}).${v.sold_to ? ` Sold to ${v.sold_to}${v.sale_price != null ? ` for ${fmtMoney(v.sale_price)}` : ''}.` : ''} Its records and history stay available.</p>` : ''}
@@ -219,6 +223,9 @@ export async function vehicleDetail(main, { id }, query) {
     ${v.archived_at ? html`<p class="banner-warn">This vehicle is archived: it is hidden from lists and tasks. Restore it to bring it back.</p>` : ''}
     <nav class="tabs" aria-label="Vehicle sections">${TABS.filter((t) => !t.when || t.when()).map((t) => html`<a class="tab" href="#/vehicles/${v.id}?tab=${t.id}" ${t.id === tab ? html`aria-current="page"` : ''}>${t.label}</a>`)}</nav>
     <div id="tab-body">${loadingHtml()}</div>`);
+  Promise.all([api.listTasks({ vehicleId: v.id }), api.listUnavailability(v.id)])
+    .then(([ts, evs]) => { const el = main.querySelector('#rag-line'); if (el) mount(el, ragLine(vehicleRag(v, ts, evs))); })
+    .catch((e) => console.error(e));
   on(main, {
     'out-of-service': () => outOfServiceModal(v.id, { onDone: again }),
     'back-in': () => backInServiceModal(v.unavailable_event_id, { onDone: again }),

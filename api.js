@@ -154,6 +154,10 @@ export async function saveOrgSettings(patch) {
   return row;
 }
 
+// The part of the red/amber/green status that the database works out, because it depends on licence and points data
+// that not every role may read: { drivers: [{ driver_id, level, reasons }], hidden_tasks: { ... } | null }. See rag.js.
+export const ragInputs = async () => ok(await sb.rpc('rag_inputs', { p_org: org() }));
+
 // ---- Vehicles needed: the minimum by vehicle type and day of the week (read by the Planner) ----
 export const listVehicleRequirements = async () =>
   ok(await sb.from('vehicle_requirements').select('*').eq('organisation_id', org()).order('category'));

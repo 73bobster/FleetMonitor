@@ -448,7 +448,7 @@ table.report { min-width: 980px; }
 table.planner { width: 100%; border-collapse: separate; border-spacing: 0; font-size: .75rem; }
 .planner th, .planner td { height: 32px; min-width: 30px; padding: 0; text-align: center; border-bottom: 1px solid var(--line); border-right: 1px solid #EFEFEF; }
 .planner .wk { border-left: 1px solid var(--line-strong); }
-.planner .pl-veh { position: sticky; left: 0; z-index: 2; width: 150px; min-width: 150px; padding: 2px 10px; font-weight: 400; text-align: left; white-space: nowrap; background: var(--surface); border-right: 1px solid var(--line-strong); }
+.planner .pl-veh { position: sticky; left: 0; z-index: 2; width: 168px; min-width: 168px; padding: 2px 10px; font-weight: 400; text-align: left; white-space: nowrap; background: var(--surface); border-right: 1px solid var(--line-strong); }
 .planner .pl-veh .plate { font-size: .8125rem; }
 .planner thead th { font-weight: 700; color: var(--ink-2); background: #FAFAFA; }
 .planner thead .pl-veh { z-index: 3; font-size: .75rem; background: #FAFAFA; }
@@ -490,7 +490,7 @@ table.planner { width: 100%; border-collapse: separate; border-spacing: 0; font-
 .sw-pl-risk { background: repeating-linear-gradient(45deg, #FFDFA0 0 3px, #FFF1D6 3px 7px); }
 .planner-lists { margin-top: 20px; }
 .planner-lists li .plate { font-size: .8125rem; }
-@media (max-width: 860px) { .planner .pl-veh { width: 128px; min-width: 128px; padding: 2px 6px; } .planner .pl-veh .plate { font-size: .75rem; } }
+@media (max-width: 860px) { .planner .pl-veh { width: 144px; min-width: 144px; padding: 2px 6px; } .planner .pl-veh .plate { font-size: .75rem; } }
 
 /* ---- Vehicle type icon beside the number plate ---- */
 .veh { display: inline-flex; align-items: center; gap: .35em; vertical-align: middle; white-space: nowrap; }
@@ -532,3 +532,31 @@ a.tag-link { text-decoration: none; color: var(--ink); }
 a.tag-link:hover { text-decoration: underline; }
 .history-link { margin-left: 6px; font-size: .75rem; white-space: nowrap; }
 .access-table th:first-child, .access-table td:first-child { min-width: 210px; overflow-wrap: normal; }
+
+/* ---- Red / amber / green ---- */
+/* Shape as well as colour, so it does not depend on telling red from green: a problem is a solid mark
+   (red a disc, amber a diamond) and no problem is a hollow ring (green, or grey for a vehicle not in service). */
+.rag { display: inline-block; flex: none; width: 11px; height: 11px; margin-right: 7px; vertical-align: middle; border-radius: 50%; box-sizing: border-box; }
+.rag-red { background: #C5221F; }
+.rag-amber { width: 10px; height: 10px; background: #E08A00; border-radius: 1px; transform: rotate(45deg); }
+.rag-green { border: 2.5px solid #1D6B45; }
+.rag-off { border: 2px solid #BDBDBD; }
+.with-rag { display: inline-flex; align-items: center; }
+.rag-line { margin: 8px 0 2px; font-size: .875rem; }
+.rag-line:empty { display: none; }
+.rag-word-red { color: #B3261E; } .rag-word-amber { color: #8A5300; } .rag-word-green { color: #1D6B45; } .rag-word-off { color: var(--ink-3); }
+.rag-why { color: var(--ink-2); }
+.rag-tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-bottom: 16px; }
+.rag-tile { display: grid; align-content: start; gap: 4px; padding: 14px 16px; color: var(--ink); text-decoration: none; background: var(--surface); border: 1px solid var(--line-strong); border-left-width: 8px; border-radius: var(--radius-lg); }
+.rag-tile:hover { background: #FAFAFA; }
+.rag-tile:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; }
+.rag-tile-red { border-left-color: #C5221F; } .rag-tile-amber { border-left-color: #E08A00; } .rag-tile-green { border-left-color: #1D6B45; } .rag-tile-off { border-left-color: #BDBDBD; }
+.rag-tile-label { font-size: .75rem; font-weight: 700; text-transform: uppercase; letter-spacing: .03em; color: var(--ink-2); }
+.rag-tile-level { display: flex; align-items: center; font: 700 1.375rem/1.2 var(--font-ui); }
+.rag-tile-red .rag-tile-level { color: #B3261E; } .rag-tile-amber .rag-tile-level { color: #8A5300; } .rag-tile-green .rag-tile-level { color: #1D6B45; }
+.rag-tile-level .rag { width: 14px; height: 14px; margin-right: 9px; }
+.rag-tile-level .rag-amber { width: 12px; height: 12px; }
+.rag-tile-why { font-size: .75rem; color: var(--ink-2); }
+.attn-what { display: inline-flex; align-items: center; }
+.planner .pl-veh .rag { margin-right: 5px; }
+@media (max-width: 860px) { .rag-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; } .rag-tile { padding: 10px 12px; } .rag-tile-level { font-size: 1.125rem; } }
