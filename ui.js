@@ -1,5 +1,6 @@
 // UI toolkit: escaped-by-default templating, dates, forms, modals, toasts.
 import { STATUS_LABEL, CATEGORY_LABEL } from './domain.js';
+import { hiddenScreens, screenOfHref } from './state.js';
 
 // ---- Templating ---------------------------------------------------------
 // html`...` escapes every interpolated value unless it is itself html`...` or raw(...).
@@ -14,7 +15,21 @@ export const html = (strings, ...vals) => {
   for (let i = 0; i < vals.length; i++) out += part(vals[i]) + strings[i + 1];
   return new Safe(out);
 };
-export const mount = (el, safe) => { el.innerHTML = safe instanceof Safe ? safe.s : esc(safe); keepDatesWhole(el); };
+export const mount = (el, safe) => { el.innerHTML = safe instanceof Safe ? safe.s : esc(safe); keepDatesWhole(el); dropHiddenLinks(el); };
+// Links to a screen that has been switched off (Settings, Screens). A button that only goes there is taken away;
+// anything else keeps its words but stops being a link. Done here so every screen and dialog follows the setting.
+function dropHiddenLinks(el) {
+  const off = hiddenScreens();
+  if (!off.length || !el.querySelectorAll) return;
+  el.querySelectorAll('a[href^="#/"]').forEach((a) => {
+    if (!off.includes(screenOfHref(a.getAttribute('href')))) return;
+    if (a.classList.contains('btn') || a.classList.contains('history-link') || a.hasAttribute('data-go')) { a.remove(); return; }
+    const span = document.createElement('span');
+    span.className = a.className;
+    span.append(...a.childNodes);
+    a.replaceWith(span);
+  });
+}
 
 // A date written with hyphens (04-Oct-26) would otherwise be split across two lines at a hyphen. After each render,
 // date text is wrapped in a span that stays on one line. Only visible text is touched: never attributes, form
@@ -113,6 +128,7 @@ const ICONS = {
   planner: '<rect x="3" y="5" width="18" height="16" rx="1"/><path d="M3 10h18M8 3v4M16 3v4M8 14h3M13 17h3"/>',
   garages: '<path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.5 2.5-2.4-.6-.6-2.4z"/>',
   settings: '<path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/>',
+  help: '<circle cx="12" cy="12" r="9"/><path d="M9.6 9.4a2.5 2.5 0 1 1 3.6 2.3c-.8.5-1.2 1-1.2 1.9M12 17v.5"/>',
   more: '<circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/>',
   plus: '<path d="M12 5v14M5 12h14"/>',
   close: '<path d="M6 6l12 12M18 6L6 18"/>',

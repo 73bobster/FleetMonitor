@@ -28,8 +28,27 @@ export const ACCESS_SUMMARY = [
   ['Documents (open and upload)', ['Full', 'Full', 'Full', 'None']],
   ['Override a block on a driver whose licence is not valid', ['Full', 'Full', 'None', 'None']],
   ['Audit log', ['View', 'View', 'None', 'None']],
-  ['Settings: vehicles needed, depots, users, date format, typical fuel economy', ['Full', 'None', 'None', 'None']],
+  ['Help, and sending feedback (each person sees what they sent and the reply)', ['Full', 'Full', 'Full', 'Full']],
+  ['Feedback log: see everything sent in, set priority, target date and status', ['Full', 'None', 'None', 'None']],
+  ['Settings: vehicles needed, depots, users, screens, date format, typical fuel economy', ['Full', 'None', 'None', 'None']],
 ];
+// Screens the superuser can switch off for everyone (Settings, Screens). The rest are always on: the app cannot be used
+// without them. Switching a screen off only hides it: nothing is deleted and every change is still audited.
+// organisations.settings.hidden_screens holds the ids that are off.
+export const OPTIONAL_SCREENS = [
+  ['planner', 'Planner', 'Vehicles available against vehicles needed, day by day.'],
+  ['incidents', 'Incidents', 'Accidents, damage and fines.'],
+  ['garages', 'Garages', 'The list of garages. Garage visits are still booked from a vehicle.'],
+  ['insurance', 'Insurance', 'Policies, the vehicles they cover, and claims.'],
+  ['costs', 'Costs', 'Total cost of ownership and monthly fuel prices.'],
+  ['reports', 'Reports', 'Damage, accidents, mileage and vehicle status reports.'],
+  ['audit', 'Audit log', 'The screen only: every change is still recorded while it is hidden.'],
+];
+export const hiddenScreens = () => { const h = state.org?.settings?.hidden_screens; return Array.isArray(h) ? h.filter((id) => OPTIONAL_SCREENS.some(([k]) => k === id)) : []; };
+export const screenOn = (id) => !hiddenScreens().includes(id);
+// The screen a link like "#/costs/123?tab=x" belongs to.
+export const screenOfHref = (href) => (/^#\/([a-z]+)/.exec(href || '') || [])[1] || '';
+
 export const MEMBER_STATUS_LABEL = { active: 'Active', disabled: 'Suspended', removed: 'Removed' };
 
 const WRITERS = ['superuser', 'fleet_admin', 'fleet_manager'];

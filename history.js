@@ -1,6 +1,6 @@
 // Turns audit-log entries into plain sentences. Used by the History tabs and the Audit log screen.
 import * as api from './api.js';
-import { ROLE_LABEL, MEMBER_STATUS_LABEL } from './state.js';
+import { ROLE_LABEL, MEMBER_STATUS_LABEL, OPTIONAL_SCREENS } from './state.js';
 import { html, plate, fmtDateTime, fmtDateShort, fmtMonth, fmtMoney } from './ui.js';
 import { driverName, CATEGORY_NOUN, INCIDENT_KIND_LABEL, FINE_TYPE_LABEL, LEAVING_REASON_LABEL, DISPOSAL_REASON_LABEL, LICENCE_STATUS_LABEL } from './domain.js';
 
@@ -8,7 +8,7 @@ export const TABLE_LABEL = {
   vehicles: 'Vehicle', drivers: 'Driver', driver_sensitive: 'Driver licence details', licence_checks: 'Licence check', vehicle_assignments: 'Driver assignment',
   compliance_items: 'Compliance item', compliance_renewals: 'Renewal', compliance_types: 'Compliance type', task_states: 'Task', insurance_policies: 'Insurance policy',
   policy_vehicles: 'Insurance cover', insurance_claims: 'Claim', incidents: 'Incident', driver_convictions: 'Conviction', driver_periods: 'Employment', documents: 'Document',
-  vehicle_costs: 'Cost', vehicle_periods: 'Period in the fleet', fuel_prices: 'Fuel price', garages: 'Garage', vehicle_unavailability: 'Garage visit or time off the road', depots: 'Depot', vehicle_requirements: 'Vehicles needed', contacts: 'Contact', organisations: 'Organisation settings', memberships: 'User access', invitations: 'Invitation',
+  vehicle_costs: 'Cost', vehicle_periods: 'Period in the fleet', fuel_prices: 'Fuel price', garages: 'Garage', vehicle_unavailability: 'Garage visit or time off the road', depots: 'Depot', vehicle_requirements: 'Vehicles needed', contacts: 'Contact', organisations: 'Organisation settings', memberships: 'User access', invitations: 'Invitation', feedback_items: 'Feedback item',
   support_grants: 'Support access', message_templates: 'Message template', odometer_readings: 'Mileage reading', external_links: 'External link', integration_connections: 'Integration',
 };
 const FIELD = { mobile_work: 'work mobile', mobile_personal: 'personal mobile', company_phone: 'company phone', gross_weight_kg: 'gross weight', payload_kg: 'payload', licence_number: 'licence number', date_of_birth: 'date of birth' };
@@ -21,7 +21,7 @@ export async function auditLookups({ users = false } = {}) {
 
 // Where an audit entry leads: the record it is about, when that record has a screen of its own. Vehicles and drivers
 // are linked from their plate and name instead. Building the link costs nothing: the ids are already in the entry.
-const SETTINGS_TABLES = ['depots', 'vehicle_requirements', 'organisations', 'memberships', 'invitations', 'compliance_types', 'message_templates'];
+const SETTINGS_TABLES = ['depots', 'vehicle_requirements', 'organisations', 'memberships', 'invitations', 'compliance_types', 'message_templates', 'feedback_items'];
 export function recordLink(e) {
   const row = e.new_data || e.old_data || {};
   if (e.table_name === 'incidents') return [`#/incidents/${e.record_id}`, 'Open the incident'];
@@ -123,7 +123,14 @@ function describe(e, L) {
         const was = o.settings || {}; const now = n.settings || {};
         const keys = Object.keys(now).filter((k) => JSON.stringify(now[k]) !== JSON.stringify(was[k]));
         const show = (x) => (x && typeof x === 'object' ? Object.entries(x).map(([a, b]) => `${a.replace(/_/g, ' ')} ${b}`).join(', ') : x);
-        return html`changed settings: ${keys.map((k) => `${k.replace(/_/g, ' ')} to ${show(now[k])}`).join('; ') || 'no visible change'}`;
+        const screenName = (id) => OPTIONAL_SCREENS.find(([k]) => k === id)?.[1] || id;
+        const one = (k) => {
+          if (k !== 'hidden_screens') return `${k.replace(/_/g, ' ')} to ${show(now[k])}`;
+          const before = Array.isArray(was[k]) ? was[k] : []; const after = Array.isArray(now[k]) ? now[k] : [];
+          const off = after.filter((id) => !before.includes(id)).map(screenName); const back = before.filter((id) => !after.includes(id)).map(screenName);
+          return [off.length ? `switched off ${off.join(', ')}` : '', back.length ? `switched on ${back.join(', ')}` : ''].filter(Boolean).join(' and ') || 'screens unchanged';
+        };
+        return html`changed settings: ${keys.map(one).join('; ') || 'no visible change'}`;
       }
       break;
     case 'memberships': {
@@ -138,6 +145,15 @@ function describe(e, L) {
       if (changed(e, 'revoked_at') && n.revoked_at) return html`revoked the invitation for ${n.email}`;
       if (changed(e, 'accepted_at') && n.accepted_at) return html`${n.email} accepted their invitation`;
       break;
+    case 'feedback_items': {
+      const ref = `#${row.ref}`; const words = String(row.description || ''); const gist = words.length > 90 ? `${words.slice(0, 90)}...` : words;
+      const kind = ({ feedback: 'feedback', error: 'an error', change: 'a change', new_feature: 'a new feature', question: 'a question' })[row.category] || 'an item';
+      const stat = ({ new: 'new', under_review: 'under review', planned: 'planned', in_progress: 'in progress', done: 'done', declined: 'not going ahead' });
+      if (e.action === 'INSERT') return html`logged ${kind} ${ref} from ${n.raised_by}: ${gist}`;
+      if (changed(e, 'status')) return html`marked ${ref} as ${stat[n.status] || n.status}${changed(e, 'response') && n.response ? html`, with the reply: ${n.response}` : ''}`;
+      if (e.action === 'UPDATE') return html`changed feedback item ${ref}`;
+      break;
+    }
     case 'vehicle_requirements':
       if (e.action !== 'DELETE') return html`${e.action === 'INSERT' ? 'set' : 'changed'} the number of ${CATEGORY_NOUN[row.category]?.[1] || 'vehicles'} needed`;
       break;

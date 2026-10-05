@@ -115,7 +115,7 @@ legend { padding: 0 6px; font-weight: 700; }
 .badge { margin-left: auto; min-width: 22px; padding: 1px 7px; font-size: .75rem; font-weight: 700; text-align: center; color: #fff; background: var(--overdue); border-radius: 99px; }
 .badge[hidden] { display: none; }
 .content { min-width: 0; }
-main { padding: 28px 32px 56px; max-width: 1180px; }
+main { padding: 28px 32px 28px; max-width: 1180px; }
 main:focus { outline: none; }
 .mobile-brand, .tabbar { display: none; }
 
@@ -222,7 +222,7 @@ main:focus { outline: none; }
   .side { display: none; }
   .mobile-brand { display: flex; align-items: center; gap: 10px; padding: calc(10px + env(safe-area-inset-top)) 16px 10px; background: var(--surface); border-bottom: 1px solid var(--line); }
   .mobile-brand .logo { height: 40px; width: auto; }
-  main { padding: 18px 16px calc(96px + env(safe-area-inset-bottom)); }
+  main { padding: 18px 16px 20px; }
   .tabbar { position: fixed; z-index: 50; left: 0; right: 0; bottom: 0; display: grid; grid-template-columns: repeat(4, 1fr); padding-bottom: env(safe-area-inset-bottom); background: var(--surface); border-top: 1px solid var(--line-strong); }
   .tab-link { position: relative; display: grid; justify-items: center; gap: 2px; padding: 9px 4px 8px; font: 400 .6875rem var(--font-ui); color: var(--ink-3); text-decoration: none; background: none; border: 0; cursor: pointer; }
   .tab-link[aria-current="page"] { color: var(--ink); font-weight: 700; box-shadow: inset 0 3px 0 var(--brand); }
@@ -581,3 +581,58 @@ table.tco { min-width: 1060px; font-size: .75rem; }
 table.tco th, table.tco td { padding: 9px 9px; }
 table.tco td.num, table.tco tfoot td { white-space: nowrap; overflow-wrap: normal; }
 table.tco thead th { white-space: normal; vertical-align: bottom; }
+
+/* ---- Version at the bottom of every screen, with the feedback link ---- */
+.screen-foot { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 2px 14px; max-width: 1180px; padding: 0 32px 22px; font-size: .6875rem; color: var(--ink-3); }
+.screen-foot .link { color: var(--ink-3); }
+.screen-foot .link:hover, .screen-foot .link:focus-visible { color: var(--ink); }
+.auth-version { margin: 28px 0 0; font-size: .6875rem; color: var(--ink-3); }
+@media (max-width: 860px) { .screen-foot { justify-content: center; padding: 0 16px calc(84px + env(safe-area-inset-bottom)); } }
+
+/* ---- Help link in the side menu ---- */
+.side-help { display: flex; align-items: center; gap: 10px; margin: 0 0 14px; padding: 8px 2px; color: var(--ink-2); text-decoration: none; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+.side-help:hover { color: var(--ink); }
+.side-help[aria-current="page"] { color: var(--ink); font-weight: 700; }
+
+/* ---- Help screen ---- */
+.help-search input[type=search] { width: min(520px, 100%); }
+.help-section { margin-bottom: 34px; }
+.help-section[hidden], .help-topic[hidden], .help-basics[hidden] { display: none; }
+.help-basics { max-width: 76ch; }
+.help-steps { margin: 12px 0; padding-left: 22px; }
+.help-steps li { margin-bottom: 6px; }
+.help-topic { border-bottom: 1px solid var(--line); }
+.help-topic:first-of-type { border-top: 1px solid var(--line); }
+.help-topic > summary { padding: 12px 2px; cursor: pointer; }
+.help-topic > summary:hover { background: var(--paper); }
+.help-title { margin-right: 12px; font-weight: 700; }
+.help-what { font-size: .875rem; }
+.help-faq > summary { font-weight: 700; }
+.help-body { max-width: 76ch; padding: 0 2px 14px 20px; }
+.help-body ul { margin: 0 0 12px; padding-left: 20px; }
+.help-body li { margin-bottom: 6px; }
+.help-ver { margin-left: 8px; font-size: .75rem; }
+
+/* ---- Feedback log ---- */
+.fb-table td { vertical-align: top; }
+.fb-text { max-width: 62ch; white-space: pre-wrap; overflow-wrap: anywhere; }
+.fb-status { display: inline-block; padding: 1px 8px; font-size: .75rem; font-weight: 700; border-radius: 3px; white-space: nowrap; color: var(--ink-2); background: var(--quiet-bg); }
+.fb-new { color: var(--info); background: var(--info-bg); }
+.fb-under_review, .fb-planned, .fb-in_progress { color: var(--soon); background: var(--soon-bg); }
+.fb-done { color: var(--ok); background: var(--ok-bg); }
+.fb-declined { font-weight: 400; }
+.fb-pri-urgent { font-weight: 700; color: var(--overdue); }
+.fb-pri-high { font-weight: 700; color: var(--soon); }
+.fb-pri-low { color: var(--ink-3); }
+
+/* ---- Settings: jump links and screen switches ---- */
+.jump { display: flex; flex-wrap: wrap; gap: 4px 16px; margin: -6px 0 24px; font-size: .875rem; }
+.screen-switches { display: grid; gap: 10px; max-width: 76ch; }
+.screen-switch { align-items: flex-start; }
+
+/* ---- Dashboard: drivers panel count line ---- */
+.drivers-count { margin: 0 0 6px; }
+.drivers-count .link { margin-left: 8px; font-weight: 400; }
+.fb-table td[data-label="Ref"], .fb-table td[data-label="Kind"], .fb-table td[data-label="Priority"], .fb-table td[data-label="Target date"], .fb-table td[data-label="Sent"] { white-space: nowrap; }
+@media (min-width: 861px) { .fb-table td[data-label="Raised"] { min-width: 210px; } }
+@media (max-width: 860px) { .fb-cell { min-width: 0; text-align: left; } .fb-table td[data-label="What"] { display: block; } .fb-table td[data-label="What"]::before { display: block; margin-bottom: 4px; } }

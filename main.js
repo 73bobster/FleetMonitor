@@ -1,11 +1,11 @@
 // Boot: connect to Supabase, work out who is signed in and which organisation they are in, then run the app.
 import { CONFIG } from './config.js';
 import * as api from './api.js';
-import { state, can, setMembership, clearState } from './state.js';
-import { route, onRoute, start as startRouter } from './router.js';
+import { state, can, setMembership, clearState, screenOn, OPTIONAL_SCREENS } from './state.js';
+import { route as addRoute, onRoute, start as startRouter } from './router.js';
 import { renderShell, setActive, setBadge } from './shell.js';
 import { showAuth, showNoAccess, showRecovery } from './auth.js';
-import { html, mount, toast, errorHtml } from './ui.js';
+import { html, mount, toast, errorHtml, emptyHtml } from './ui.js';
 import { tasksView } from './tasks.js';
 import { vehiclesList, vehicleForm, vehicleDetail } from './vehicles.js';
 import { driversList, driverForm, driverDetail } from './drivers.js';
@@ -18,7 +18,7 @@ import { reportsView } from './reports.js';
 import { garagesView } from './garages.js';
 import { plannerView } from './planner.js';
 import { costsView, costDetailView } from './costs.js';
-import { placeholder } from './placeholder.js';
+import { helpView } from './help.js';
 
 const INVITE_KEY = 'fm:invite';
 const store = {
@@ -39,6 +39,14 @@ function captureInvite() {
 }
 
 // ---- Routes ---------------------------------------------------------------------
+// A screen the superuser has switched off (Settings, Screens) is not opened, even from a saved link or a bookmark.
+function screenOff(main, section) {
+  const name = OPTIONAL_SCREENS.find(([id]) => id === section)?.[1] || 'This screen';
+  mount(main, html`<header class="page-head"><h1>${name}</h1></header>${emptyHtml(`${name} is switched off`,
+    can.configure ? 'It is hidden for everyone. Nothing has been deleted, and you can switch it back on in Settings, under Screens.' : 'It has been hidden for everyone. Nothing has been deleted. Ask the superuser if you need it.',
+    html`<p><a class="btn" href="${can.configure ? '#/settings' : '#/dashboard'}">${can.configure ? 'Open Settings' : 'Go to the dashboard'}</a></p>`)}`);
+}
+const route = (pattern, section, handler) => addRoute(pattern, section, (m, p, q) => (screenOn(section) ? handler(m, p, q) : screenOff(m, section)));
 route('/dashboard', 'dashboard', (m) => dashboardView(m));
 route('/tasks', 'tasks', (m, p, q) => tasksView(m, q));
 route('/planner', 'planner', (m) => plannerView(m));
@@ -64,6 +72,7 @@ route('/costs/:id', 'costs', (m, p) => costDetailView(m, p));
 route('/reports', 'reports', (m, p, q) => reportsView(m, p, q));
 route('/audit', 'audit', (m) => auditView(m));
 route('/settings', 'settings', (m) => settingsView(m));
+route('/help', 'help', (m, p, q) => helpView(m, q));
 onRoute(setActive);
 
 // ---- Session flow -----------------------------------------------------------------

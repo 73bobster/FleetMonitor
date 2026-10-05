@@ -1,16 +1,22 @@
-// Settings (superuser only). Vehicles needed, depots, users and invitations, and the date format. Compliance types, templates and branding come later.
+// Settings (superuser only). Vehicles needed, depots, users and invitations, which screens are switched on, the date format,
+// typical fuel economy, and the feedback log. Compliance types, templates and branding come later.
 import * as api from './api.js';
-import { state, can, ROLE_LABEL, ROLE_HINT, ROLE_ORDER, ACCESS_SUMMARY, MEMBER_STATUS_LABEL } from './state.js';
+import { state, can, ROLE_LABEL, ROLE_HINT, ROLE_ORDER, ACCESS_SUMMARY, MEMBER_STATUS_LABEL, OPTIONAL_SCREENS, screenOn } from './state.js';
 import { html, mount, on, openModal, fieldsHtml, readForm, toast, loadingHtml, emptyHtml, fmtDateShort, formatDate, DATE_FORMATS, getDateFormat, setDateFormat } from './ui.js';
 import { CATEGORY_LABEL, WEEKDAYS } from './domain.js';
 import { DEFAULT_TYPICAL_MPG, DEFAULT_MILES_PER_KWH } from './tco.js';
+import { refreshNav } from './shell.js';
+import { FB_CATEGORY, FB_STATUS, fbIsOpen, fbIsLate, fbRef, fbSort, fbStatusHtml, fbPriorityHtml, feedbackModal } from './feedback.js';
+
+const SECTIONS = [['set-needs', 'Vehicles needed'], ['set-depots', 'Depots'], ['set-users', 'Users and access'], ['set-screens', 'Screens'], ['set-dates', 'Date format'], ['set-fuel', 'Fuel economy'], ['set-feedback', 'Feedback and changes']];
 
 export async function settingsView(main) {
   if (!can.configure) { mount(main, html`<header class="page-head"><h1>Settings</h1></header>${emptyHtml("You don't have access to settings", 'Only the superuser can change settings.')}`); return; }
   mount(main, html`<header class="page-head"><h1>Settings</h1></header>${loadingHtml()}`);
-  const load = () => Promise.all([api.listAllDepots(), api.listVehicles(), api.listDrivers(), api.listVehicleRequirements(), api.listMembers(), api.listInvitations()]);
-  let [depots, vehicles, drivers, needs, members, invites] = await load();
+  const load = () => Promise.all([api.listAllDepots(), api.listVehicles(), api.listDrivers(), api.listVehicleRequirements(), api.listMembers(), api.listInvitations(), api.listFeedback()]);
+  let [depots, vehicles, drivers, needs, members, invites, feedback] = await load();
   let showRemoved = false;
+  const fbShow = { status: 'open', category: '' };   // which feedback items the log is showing
   const typicalMpg = () => state.org.settings?.typical_mpg || {};   // only the figures this organisation has changed
   // Vehicles needed: one row per vehicle type that is in the fleet (or already has numbers), one box per day of the week.
   const inFleet = (cat) => vehicles.filter((v) => v.category === cat && !v.archived_at && v.status !== 'disposed').length;
@@ -67,6 +73,39 @@ export async function settingsView(main) {
   }
   const usage = (id) => ({ v: vehicles.filter((x) => x.depot_id === id && !x.archived_at && x.status !== 'disposed').length, d: drivers.filter((x) => x.depot_id === id && x.employment_status === 'active').length });
 
+  // ---- Feedback log: everything anyone has sent in, most pressing first ----
+  function feedbackHtml() {
+    const open = feedback.filter(fbIsOpen);
+    const rows = fbSort(feedback.filter((i) => (fbShow.status === 'open' ? fbIsOpen(i) : fbShow.status === 'closed' ? !fbIsOpen(i) : !fbShow.status || i.status === fbShow.status) && (!fbShow.category || i.category === fbShow.category)));
+    const late = open.filter((i) => fbIsLate(i)).length; const urgent = open.filter((i) => i.priority === 'urgent').length;
+    return html`
+      <p class="summary"><strong>${open.length}</strong> open${urgent ? html`, <span class="c-overdue">${urgent} urgent</span>` : ''}${late ? html`, <span class="c-overdue">${late} past the target date</span>` : ''}. ${feedback.length - open.length} closed.</p>
+      <div class="filters">
+        <label class="inline"><span class="sr-only">Status</span><select id="fb-status">
+          ${[['open', 'Open items'], ['', 'Everything'], ['closed', 'Closed items'], ...Object.entries(FB_STATUS)].map(([k, l]) => html`<option value="${k}" ${k === fbShow.status ? 'selected' : ''}>${l}</option>`)}</select></label>
+        <label class="inline"><span class="sr-only">Kind</span><select id="fb-category"><option value="">All kinds</option>
+          ${Object.entries(FB_CATEGORY).map(([k, l]) => html`<option value="${k}" ${k === fbShow.category ? 'selected' : ''}>${l}</option>`)}</select></label>
+      </div>
+      ${rows.length ? html`<table class="grid fb-table"><thead><tr><th>Ref</th><th>Raised</th><th>Kind</th><th>Priority</th><th>What and the result wanted</th><th>Target date</th><th>Status</th><th></th></tr></thead><tbody>
+        ${rows.map((i) => html`<tr class="${fbIsOpen(i) ? '' : 'row-off'}">
+          <td data-label="Ref">${fbRef(i)}</td>
+          <td data-label="Raised"><div>${fmtDateShort(i.created_at)}<div class="sub">${i.raised_by}</div></div></td>
+          <td data-label="Kind">${FB_CATEGORY[i.category] || i.category}</td>
+          <td data-label="Priority">${fbPriorityHtml(i)}</td>
+          <td data-label="What"><div class="fb-cell"><span class="muted">${i.screen || 'Whole app'}${i.screen_version ? ` ${i.screen_version}` : ''}</span><div class="fb-text">${i.description}</div>${i.target_outcome ? html`<div class="fb-text sub"><strong>Result wanted:</strong> ${i.target_outcome}</div>` : ''}${i.response ? html`<div class="fb-text sub"><strong>Reply:</strong> ${i.response}</div>` : ''}</div></td>
+          <td data-label="Target date">${i.target_date ? html`<span class="${fbIsLate(i) ? 'c-overdue' : ''}">${fmtDateShort(i.target_date)}</span>` : html`<span class="muted">Not set</span>`}</td>
+          <td data-label="Status">${fbStatusHtml(i)}</td>
+          <td class="act"><button class="btn btn-sm" data-action="fb-edit" data-id="${i.id}">Open</button></td></tr>`)}
+      </tbody></table>` : feedback.length ? html`<p class="muted">Nothing matches. Choose "Everything" to see the whole log.</p>` : emptyHtml('Nothing in the log yet', 'Anyone can send feedback from the link at the bottom of every screen. You can also add an item here yourself.')}`;
+  }
+  function drawFeedback() {
+    const box = main.querySelector('#fb-block'); if (!box) return;
+    mount(box, feedbackHtml());
+    box.querySelector('#fb-status').addEventListener('change', (e) => { fbShow.status = e.target.value; drawFeedback(); });
+    box.querySelector('#fb-category').addEventListener('change', (e) => { fbShow.category = e.target.value; drawFeedback(); });
+  }
+  const reloadFeedback = async () => { feedback = await api.listFeedback(); drawFeedback(); };
+
   const specs = [
     { name: 'name', label: 'Depot name', required: true, span: 2 },
     { name: 'address', label: 'Address', type: 'textarea', rows: 2, span: 2 },
@@ -76,12 +115,13 @@ export async function settingsView(main) {
   function draw() {
     mount(main, html`
       <header class="page-head"><h1>Settings</h1></header>
-      <section class="settings-block">
+      <p class="jump"><span class="muted">Go to:</span> ${SECTIONS.map(([id, label]) => html`<button type="button" class="link" data-action="jump" data-to="${id}">${label}</button>`)}</p>
+      <section class="settings-block" id="set-needs">
         <div class="section-head"><h2>Vehicles needed</h2><a class="btn btn-sm" href="#/planner">Open the planner</a></div>
         <p class="muted">The fewest vehicles of each type you need on the road on each day of the week, across the whole fleet. The Planner uses these numbers to flag days when too few are available. Leave a day at 0 if there is no minimum.</p>
         ${needsHtml()}
       </section>
-      <section>
+      <section id="set-depots">
         <div class="section-head"><h2>Depots</h2><button class="btn btn-primary" data-action="add">Add depot</button></div>
         <p class="muted">The master list of depots. Vehicles and drivers choose from this list.</p>
         ${depots.length ? html`<table class="grid"><thead><tr><th>Depot</th><th>Address</th><th class="num">Vehicles</th><th class="num">Drivers</th><th></th></tr></thead><tbody>
@@ -93,7 +133,7 @@ export async function settingsView(main) {
               <button class="btn btn-sm" data-action="${d.archived_at ? 'restore' : 'archive'}" data-id="${d.id}">${d.archived_at ? 'Restore' : 'Archive'}</button></td></tr>`; })}
         </tbody></table>` : emptyHtml('No depots yet', 'Add the sites your vehicles and drivers work from.')}
       </section>
-      <section class="settings-block spaced-top">
+      <section class="settings-block spaced-top" id="set-users">
         <div class="section-head"><h2>Users and access</h2><button class="btn btn-primary" data-action="invite">Invite user</button></div>
         <p class="muted">Who can sign in to ${state.org.name} and what they are allowed to do. Nobody is ever deleted: a suspended user can be reinstated, and a removed user is kept so the audit log stays complete and must be invited again to come back.</p>
         ${members.some((m) => m.status === 'removed') ? html`<p><label class="check small"><input type="checkbox" id="show-removed" ${showRemoved ? 'checked' : ''}> <span>Show removed users (${members.filter((m) => m.status === 'removed').length})</span></label></p>` : ''}
@@ -121,7 +161,15 @@ export async function settingsView(main) {
           <p class="hint">Full: see, add and change. View: see only. None: not shown at all.</p>
         </details>
       </section>
-      <section class="settings-block">
+      <section class="settings-block" id="set-screens">
+        <div class="section-head"><h2>Screens</h2></div>
+        <p class="muted">Untick a screen to switch it off. It is then hidden for everyone in ${state.org.name}, including you: it leaves the menu, and links to it are taken away. Nothing is deleted, the records behind it are kept, and every change is still recorded in the audit log. Dashboard, Tasks, Vehicles, Drivers, Settings and Help are always on.</p>
+        <form id="screens-form" class="screen-switches">
+          ${OPTIONAL_SCREENS.map(([id, label, hint]) => html`<label class="check screen-switch"><input type="checkbox" name="${id}" ${screenOn(id) ? 'checked' : ''}> <span><strong>${label}</strong> <span class="muted">${hint}</span></span></label>`)}
+          <p><button class="btn btn-primary" type="submit">Save screens</button></p>
+        </form>
+      </section>
+      <section class="settings-block" id="set-dates">
         <div class="section-head"><h2>Date format</h2></div>
         <p class="muted">How dates are shown on every screen and in downloaded reports, for everyone in ${state.org.name}. Boxes where you pick a date follow each person's own browser settings.</p>
         <form id="date-form" class="inline-form">
@@ -129,7 +177,7 @@ export async function settingsView(main) {
           <button class="btn btn-primary" type="submit">Save date format</button>
         </form>
       </section>
-      <section class="settings-block">
+      <section class="settings-block" id="set-fuel">
         <div class="section-head"><h2>Typical fuel economy</h2><a class="btn btn-sm" href="#/costs?tab=fuel">Open fuel prices</a></div>
         <p class="muted">Used to work out fuel cost for any vehicle that has no fuel economy figure on its own record. These are typical figures for each type, not measurements, and costs that rest on them are marked as such. Leave a box empty to go back to the standard figure.</p>
         <form id="mpg-form" class="needs" novalidate>
@@ -141,8 +189,21 @@ export async function settingsView(main) {
           <p><button class="btn btn-primary" type="submit">Save fuel economy</button></p>
         </form>
       </section>
+      <section class="settings-block" id="set-feedback">
+        <div class="section-head"><h2>Feedback and changes</h2><button class="btn btn-primary" data-action="fb-add">Add item</button></div>
+        <p class="muted">The log of feedback, errors, changes and new features. Anyone can send an item from the link at the bottom of every screen, and sees your reply under Help. Only you see the whole log and set the priority, target date and status. Items are never deleted: close one as Done or Not going ahead.</p>
+        <div id="fb-block"></div>
+      </section>
       <section class="later"><h2>Coming later</h2><p class="muted">Task types and reminder timings, message templates, and branding will be managed here.</p></section>`);
     wireNeeds();
+    drawFeedback();
+    main.querySelector('#screens-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const form = e.target; const btn = form.querySelector('button[type="submit"]'); btn.disabled = true;
+      const off = OPTIONAL_SCREENS.map(([id]) => id).filter((id) => !form.elements[id].checked);
+      try { await api.saveOrgSettings({ hidden_screens: off }); refreshNav(); toast(off.length ? `Screens saved. ${off.length} switched off.` : 'Screens saved. All switched on.'); draw(); main.querySelector('#set-screens')?.scrollIntoView?.({ block: 'start' }); }
+      catch (ex) { toast(ex.message || 'Could not save.', 'error'); btn.disabled = false; }
+    });
     main.querySelector('#mpg-form').addEventListener('submit', async (e) => {
       e.preventDefault();
       const form = e.target; const err = form.querySelector('.form-error'); err.hidden = true;
@@ -239,13 +300,16 @@ export async function settingsView(main) {
       },
     });
   }
-  const reload = async () => { [depots, vehicles, drivers, needs, members, invites] = await load(); draw(); };
+  const reload = async () => { [depots, vehicles, drivers, needs, members, invites, feedback] = await load(); draw(); };
   const open = (d) => openModal({
     title: d ? 'Edit depot' : 'Add depot', submitLabel: 'Save', body: fieldsHtml(specs, d || {}),
     onSubmit: async (f) => { const v = readForm(f, specs); await api.saveDepot(v, d?.id); toast('Depot saved.'); await reload(); },
   });
   draw();
   on(main, {
+    jump: (el) => main.querySelector(`#${el.dataset.to}`)?.scrollIntoView?.({ behavior: 'smooth', block: 'start' }),
+    'fb-add': () => feedbackModal({ onSaved: reloadFeedback }),
+    'fb-edit': (el) => feedbackModal({ item: feedback.find((i) => i.id === el.dataset.id), onSaved: reloadFeedback }),
     invite: () => inviteModal(),
     'member-type': (el) => memberTypeModal(memberBy(el)),
     'member-suspend': (el) => memberStatusModal(memberBy(el), 'disabled'),

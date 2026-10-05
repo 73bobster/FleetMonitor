@@ -1,7 +1,10 @@
 // The signed-in frame: sidebar on desktop, tab bar on mobile, brand colours, org switcher.
 import { html, mount, on, icon, openModal, closeModal, logoImg, wireLogos, setDateFormat } from './ui.js';
-import { state, can, ROLE_LABEL } from './state.js';
+import { state, can, ROLE_LABEL, screenOn } from './state.js';
 import * as api from './api.js';
+import { dispatch } from './router.js';
+import { screenLabel, versionOf } from './versions.js';
+import { feedbackModal } from './feedback.js';
 
 const NAV = [
   { id: 'dashboard', label: 'Dashboard', href: '#/dashboard' },
@@ -18,7 +21,11 @@ const NAV = [
   { id: 'settings', label: 'Settings', href: '#/settings', when: () => can.configure },
 ];
 const TABS = ['dashboard', 'tasks', 'vehicles', 'drivers'];
-const visibleNav = () => NAV.filter((n) => !n.when || n.when());
+// A screen shows in the menu if this person's user type allows it and the superuser has not switched it off.
+const visibleNav = () => NAV.filter((n) => (!n.when || n.when()) && screenOn(n.id));
+const HELP = { id: 'help', label: 'Help', href: '#/help' };
+let current = '';      // the screen being shown, for the version at the bottom and for feedback
+let badgeCount = 0;
 
 // ---- Brand ------------------------------------------------------------------
 function luminance(hex) {
@@ -59,11 +66,12 @@ export function renderShell({ onSwitchOrg, onSignOut }) {
         <nav class="side-nav" aria-label="Main">${visibleNav().map((n) => navLink(n, 'side-link'))}</nav>
         <div class="side-foot">
           ${state.memberships.length > 1 ? html`<label class="side-switch"><span>Organisation</span><select id="org-switch">${state.memberships.map((m) => html`<option value="${m.organisation_id}" ${m.organisation_id === org.id ? 'selected' : ''}>${m.organisation.name}</option>`)}</select></label>` : ''}
+          <a class="side-help" href="#/help" data-nav="help">${icon('help')}<span>Help</span></a>
           <p class="side-user"><span class="side-email">${state.user.email}</span><span class="side-role">${ROLE_LABEL[state.role]}</span></p>
           <button class="side-signout" type="button" data-action="signout">Sign out</button>
         </div>
       </aside>
-      <div class="content"><header class="mobile-brand"><a class="brand-link" href="#/dashboard" aria-label="${org.name}: go to the dashboard">${logoImg(logo, org.name)}</a></header><main id="main" tabindex="-1"></main></div>
+      <div class="content"><header class="mobile-brand"><a class="brand-link" href="#/dashboard" aria-label="${org.name}: go to the dashboard">${logoImg(logo, org.name)}</a></header><main id="main" tabindex="-1"></main><footer class="screen-foot" id="screen-foot"></footer></div>
       <nav class="tabbar" aria-label="Main">
         ${NAV.filter((n) => TABS.includes(n.id)).map((n) => navLink(n, 'tab-link'))}
         <button type="button" class="tab-link" data-action="more">${icon('more')}<span>More</span></button>
@@ -74,12 +82,14 @@ export function renderShell({ onSwitchOrg, onSignOut }) {
   on(root, {
     signout: () => onSignOut(),
     more: () => openMenu(onSignOut),
+    // after sending from Help or Settings, redraw that screen so the new item shows in its list
+    feedback: () => feedbackModal({ section: current, onSaved: () => { if (current === 'help' || current === 'settings') dispatch(); } }),
   });
   root.querySelector('#org-switch')?.addEventListener('change', (e) => onSwitchOrg(e.target.value));
 }
 
 function openMenu(onSignOut) {
-  const rest = visibleNav().filter((n) => !TABS.includes(n.id));
+  const rest = [...visibleNav().filter((n) => !TABS.includes(n.id)), HELP];
   const dlg = openModal({
     title: 'Menu',
     hideFooter: true,
@@ -96,6 +106,7 @@ function openMenu(onSignOut) {
 }
 
 export function setBadge(id, n) {
+  if (id === 'tasks') badgeCount = n;
   document.querySelectorAll(`[data-badge="${id}"]`).forEach((el) => {
     el.textContent = n > 99 ? '99+' : String(n);
     el.hidden = !n;
@@ -104,7 +115,19 @@ export function setBadge(id, n) {
 }
 
 export function setActive(section) {
+  current = section;
   document.querySelectorAll('[data-nav]').forEach((a) => {
     if (a.dataset.nav === section) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
   });
+  // The very bottom of every screen: that screen's own version, and the way to send feedback about it.
+  const foot = document.getElementById('screen-foot');
+  if (foot) mount(foot, html`<span class="screen-version">${screenLabel(section)} ${versionOf(section)}</span><button type="button" class="link" data-action="feedback">Send feedback</button>`);
+}
+
+// Redraws the menu after the superuser switches screens on or off, without disturbing the screen that is open.
+export function refreshNav() {
+  const nav = document.querySelector('.side-nav');
+  if (nav) mount(nav, html`${visibleNav().map((n) => navLink(n, 'side-link'))}`);
+  setBadge('tasks', badgeCount);
+  setActive(current);
 }

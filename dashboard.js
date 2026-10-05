@@ -1,6 +1,6 @@
 // Management dashboard: fleet status and what needs attention now, and what happened in the chosen period.
 import * as api from './api.js';
-import { can } from './state.js';
+import { can, screenOn } from './state.js';
 import { html, mount, plate, pill, loadingHtml, fmtDateShort, fmtMoney, fmtInt, dueText, todayStr, addDaysISO, plural } from './ui.js';
 import { UNAVAIL_REASON_LABEL, availability, taskCategory, incidentTitle, incidentCost, driverName } from './domain.js';
 import { loadPeriod, periodControlsHtml, wirePeriod, periodLabel, inPeriod, milesFromRows, eventDaysInPeriod, eventTouchesPeriod } from './insight.js';
@@ -9,7 +9,9 @@ import { buildRag, ragDot, ragTile } from './rag.js';
 
 const sum = (list, f) => list.reduce((s, x) => s + Number(f(x) || 0), 0);
 const link = (href, content, cls = '') => html`<a class="${cls}" href="${href}">${content}</a>`;
-const DRIVERS_SHOWN = 5;   // the drivers panel lists only the worst offenders
+const DRIVERS_SHOWN = 5;   // the drivers panel lists only the worst offenders, unless asked for them all
+// A row of links, leaving out any that lead to a screen that has been switched off.
+const linkRow = (pairs) => { const on = pairs.filter(([href]) => screenOn(href.slice(2).split(/[/?]/)[0])); return on.length ? html`<p>${on.map(([href, text], i) => html`${i ? ' · ' : ''}<a href="${href}">${text}</a>`)}</p>` : ''; };
 
 export async function dashboardView(main) {
   mount(main, html`<header class="page-head"><h1>Dashboard</h1></header>${loadingHtml('Loading the dashboard')}`);
@@ -21,6 +23,7 @@ export async function dashboardView(main) {
     can.sensitive ? api.listConvictions() : [], fetchPeriod(p), api.listVehicleRequirements(), api.ragInputs(), api.listVehiclePeriods(),
   ]);
   let [costs, mileRowsRaw] = first;
+  let allOffenders = false;   // the drivers panel: show every driver with something against them, not just the worst
   const today = todayStr();
   const vById = new Map(vehicles.map((v) => [v.id, v]));
   const gById = new Map(garages.map((g) => [g.id, g]));
@@ -96,7 +99,14 @@ export async function dashboardView(main) {
       return { d, points: sum(cs.filter((c) => c.licence_until >= today), (c) => c.points), totting: sum(cs.filter((c) => c.totting_until >= today), (c) => c.points), accidents: a, damage: dm, combined: a + dm };
     }).sort((x, y) => (can.sensitive ? y.points - x.points : 0) || y.combined - x.combined || driverName(x.d).localeCompare(driverName(y.d)));
     const offenders = rows.filter((r) => (can.sensitive && (r.points || r.totting)) || r.combined);
-    const shown = offenders.slice(0, DRIVERS_SHOWN);
+    const shown = allOffenders ? offenders : offenders.slice(0, DRIVERS_SHOWN);
+    // What the list is counting, in words. Points are as the licence stands today; accidents and damage are for the period.
+    const marks = can.sensitive ? 'points, accidents or damage' : 'accidents or damage';
+    const driversLine = !rows.length ? 'There are no active drivers.'
+      : !offenders.length ? `No active drivers have ${can.sensitive ? 'points on their licence, or ' : ''}accidents or damage in this period.`
+        : offenders.length > DRIVERS_SHOWN ? `Showing ${allOffenders ? `all ${offenders.length}` : `the ${DRIVERS_SHOWN} worst of ${offenders.length}`} drivers with ${marks}.`
+          : offenders.length === rows.length ? `${rows.length === 1 ? 'The only active driver has' : `All ${rows.length} active drivers have`} ${marks}.`
+            : `${offenders.length} of ${rows.length} active drivers ${offenders.length === 1 ? 'has' : 'have'} ${marks}. The rest are clear.`;
     const series = buildAvailabilitySeries(vehicles, liveEvents, p, today, periods);
     const t = series.totals;
 
@@ -109,7 +119,7 @@ export async function dashboardView(main) {
 
       <div class="rag-tiles">
         ${ragTile('Overall', R.overall, '#/tasks')}
-        ${ragTile('Vehicle pool', R.vehiclePool, '#/planner')}
+        ${ragTile('Vehicle pool', R.vehiclePool, screenOn('planner') ? '#/planner' : '#/vehicles?rag=1')}
         ${ragTile('Driver pool', R.driverPool, '#/drivers?rag=1')}
         ${ragTile('Admin', R.admin, '#/tasks?status=overdue')}
       </div>
@@ -168,18 +178,19 @@ export async function dashboardView(main) {
           </tbody></table>
           ${inc.length ? html`<h3>Most recent</h3><ul class="plain">${inc.slice(0, 5).map((i) => html`<li>${link(`#/incidents/${i.id}`, `${fmtDateShort(i.incident_date)} ${incidentTitle(i)}`)} ${i.vehicle_id && vById.get(i.vehicle_id) ? html`${vdot(i.vehicle_id)}${plate(vById.get(i.vehicle_id).registration, vById.get(i.vehicle_id).category)}` : ''}
             ${dById.get(i.driver_id) ? ddot(i.driver_id) : ''}${dById.get(i.driver_id) ? link(`#/drivers/${i.driver_id}`, driverName(dById.get(i.driver_id))) : html`<span class="muted">${i.driver_id ? 'Archived driver' : 'No driver recorded'}</span>`} <span class="muted">${incidentCost(i) ? fmtMoney(incidentCost(i)) : ''}</span></li>`)}</ul>` : html`<p class="muted">Nothing recorded in this period.</p>`}
-          <p><a href="#/reports?report=damage">Vehicle damage report</a> · <a href="#/reports?report=accidents">Accidents report</a></p>
+          ${linkRow([['#/reports?report=damage', 'Vehicle damage report'], ['#/reports?report=accidents', 'Accidents report']])}
         </section>
         <section class="dash-panel"><h2>Downtime and garages</h2>
           <table class="mini"><tbody><tr><th>Garage visits</th><td class="num">${garageVisits.length}</td></tr><tr><th>Vehicle-days out of service</th><td class="num">${lostDays}</td></tr>
             <tr><th>Vehicles affected</th><td class="num">${new Set(touched.map((e) => e.vehicle_id)).size}</td></tr></tbody></table>
           ${garageVisits.length ? html`<h3>Visits</h3><ul class="plain">${garageVisits.slice(0, 5).map((e) => html`<li>${vById.get(e.vehicle_id) ? html`${vdot(e.vehicle_id)}${plate(vById.get(e.vehicle_id).registration, vById.get(e.vehicle_id).category)}` : ''} <span class="muted">${UNAVAIL_REASON_LABEL[e.reason]} at ${gById.get(e.garage_id)?.name || 'a garage'}, ${fmtDateShort(e.from_date)}</span></li>`)}</ul>` : ''}
-          <p><a href="#/reports?report=status">Vehicle status report</a> · <a href="#/garages">Garages</a></p>
+          ${linkRow([['#/reports?report=status', 'Vehicle status report'], ['#/garages', 'Garages']])}
         </section>
       </div>
 
-      <section class="dash-panel wide"><h2>Drivers: top ${DRIVERS_SHOWN}</h2>
-        <p class="muted drivers-note">The ${DRIVERS_SHOWN} drivers with the most ${can.sensitive ? 'points, then the most ' : ''}accidents and damage together. ${can.sensitive ? 'Points are on the licence now. ' : ''}Accidents and damage are for the period.</p>
+      <section class="dash-panel wide"><h2>Drivers: worst offenders</h2>
+        <p class="drivers-count"><strong>${driversLine}</strong>${offenders.length > DRIVERS_SHOWN ? html` <button type="button" class="link" id="drivers-all">${allOffenders ? `Show the ${DRIVERS_SHOWN} worst` : `Show all ${offenders.length}`}</button>` : ''}</p>
+        ${offenders.length ? html`<p class="muted drivers-note">Ranked by ${can.sensitive ? 'points on the licence now, then by ' : ''}accidents and damage together in the period.</p>` : ''}
         ${shown.length ? html`<table class="grid keep compact drivers-summary"><thead><tr><th>Driver</th>${can.sensitive ? html`<th class="num">Points</th>` : ''}<th class="num">Accidents</th><th class="num">Damage</th><th class="num">Total</th></tr></thead><tbody>
           ${shown.map((r) => html`<tr>
             <td data-label="Driver"><span class="with-rag">${ddot(r.d.id)}${link(`#/drivers/${r.d.id}`, driverName(r.d))}</span></td>
@@ -188,10 +199,11 @@ export async function dashboardView(main) {
             <td data-label="Damage" class="num">${r.damage || html`<span class="muted">0</span>`}</td>
             <td data-label="Total" class="num">${r.combined ? html`<strong>${r.combined}</strong>` : html`<span class="muted">0</span>`}</td></tr>`)}
         </tbody></table>
-        ` : html`<p class="muted">${rows.length ? `No active driver has ${can.sensitive ? 'points, ' : ''}accidents or damage to show.` : 'There are no active drivers.'}</p>`}
+        ` : ''}
         <p><a href="#/drivers">All drivers</a></p>
       </section>`);
     wirePeriod(main, p, onPeriod);
+    main.querySelector('#drivers-all')?.addEventListener('click', () => { allOffenders = !allOffenders; const y = window.scrollY; render(); window.scrollTo?.(0, y); });
     drawChart(series);
   }
 

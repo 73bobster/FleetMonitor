@@ -158,6 +158,15 @@ export async function saveOrgSettings(patch) {
   return row;
 }
 
+// ---- Feedback log ----
+// Everyone can send an item and sees their own; the superuser sees them all and is the only one who can change them.
+// The database decides which rows come back, and ignores priority, status, target date and reply from anyone else.
+export const listFeedback = async () => all(() => sb.from('feedback_items').select('*').eq('organisation_id', org()).order('created_at', { ascending: false }).order('id'));
+export async function saveFeedback(values, id) {
+  if (id) return ok(await sb.from('feedback_items').update(values).eq('id', id).eq('organisation_id', org()).select().single());
+  return ok(await sb.from('feedback_items').insert({ ...values, organisation_id: org() }).select().single());
+}
+
 // ---- Periods in the fleet, and bringing a disposed vehicle back ----
 // Each spell a vehicle spends in the fleet: { vehicle_id, start_date, end_date, disposal_reason, sale_price, sold_to, notes }.
 export const listVehiclePeriods = async (vehicleId) =>

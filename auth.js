@@ -3,6 +3,7 @@ import * as api from './api.js';
 import { html, mount, on, plate, toast, logoImg, wireLogos } from './ui.js';
 import { applyBrand } from './shell.js';
 import { CONFIG } from './config.js';
+import { versionOf } from './versions.js';
 
 const root = () => document.getElementById('app');
 
@@ -15,7 +16,7 @@ function frame(inner) {
         <p class="auth-line">Fleet compliance for ${CONFIG.brand?.name || 'your business'}, in one place.</p>
         <div class="auth-plates">${plate('AB12 CDE')}${plate('FM26 MOT')}${plate('XY74 LIC')}</div>
       </aside>
-      <main class="auth-main" id="main"><div class="auth-card">${logoImg(CONFIG.brand?.logoUrl, CONFIG.brand?.name || 'FleetMonitor')}${inner}</div></main>
+      <main class="auth-main" id="main"><div class="auth-card">${logoImg(CONFIG.brand?.logoUrl, CONFIG.brand?.name || 'FleetMonitor')}${inner}<p class="auth-version">${versionOf('signin')}</p></div></main>
     </div>`);
   wireLogos(root());
 }
