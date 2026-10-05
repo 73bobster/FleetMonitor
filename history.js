@@ -1,6 +1,6 @@
 // Turns audit-log entries into plain sentences. Used by the History tabs and the Audit log screen.
 import * as api from './api.js';
-import { ROLE_LABEL, MEMBER_STATUS_LABEL, OPTIONAL_SCREENS } from './state.js';
+import { ROLE_LABEL, MEMBER_STATUS_LABEL, OPTIONAL_SCREENS, dashLayout } from './state.js';
 import { html, plate, fmtDateTime, fmtDateShort, fmtMonth, fmtMoney } from './ui.js';
 import { driverName, CATEGORY_NOUN, INCIDENT_KIND_LABEL, FINE_TYPE_LABEL, LEAVING_REASON_LABEL, DISPOSAL_REASON_LABEL, LICENCE_STATUS_LABEL } from './domain.js';
 
@@ -125,6 +125,13 @@ function describe(e, L) {
         const show = (x) => (x && typeof x === 'object' ? Object.entries(x).map(([a, b]) => `${a.replace(/_/g, ' ')} ${b}`).join(', ') : x);
         const screenName = (id) => OPTIONAL_SCREENS.find(([k]) => k === id)?.[1] || id;
         const one = (k) => {
+          if (k === 'dashboard') {
+            // which dashboard sections were hidden or shown, and whether the order changed
+            const before = dashLayout(was); const after = dashLayout(now); const wasOn = new Set(before.filter((x) => x.show).map((x) => x.id));
+            const hid = after.filter((x) => !x.show && wasOn.has(x.id)).map((x) => x.label); const shown = after.filter((x) => x.show && !wasOn.has(x.id)).map((x) => x.label);
+            const moved = before.map((x) => x.id).join() !== after.map((x) => x.id).join();
+            return `dashboard display: ${[hid.length ? `hid ${hid.join(', ')}` : '', shown.length ? `showed ${shown.join(', ')}` : '', moved ? `new order ${after.map((x) => x.label).join(', ')}` : ''].filter(Boolean).join('; ') || 'no visible change'}`;
+          }
           if (k !== 'hidden_screens') return `${k.replace(/_/g, ' ')} to ${show(now[k])}`;
           const before = Array.isArray(was[k]) ? was[k] : []; const after = Array.isArray(now[k]) ? now[k] : [];
           const off = after.filter((id) => !before.includes(id)).map(screenName); const back = before.filter((id) => !after.includes(id)).map(screenName);

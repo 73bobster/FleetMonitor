@@ -9,8 +9,9 @@ import { feedbackModal, myFeedbackHtml } from './feedback.js';
 // Each guide: [screen id, title, what it is for, [steps and tips]]. A function is used where the words depend on the user type.
 const GUIDES = () => [
   ['dashboard', 'Dashboard', 'The state of the fleet on one screen: what needs attention today, and what happened in the period you choose.', [
-    'The four coloured tiles at the top are the red, amber and green status for the whole operation, the vehicle pool, the driver pool and the admin work. Click a tile to see what is behind it.',
-    'The period buttons (Last 7 days, Last 30 days and so on) change the accidents, costs, mileage, downtime and chart. Fleet status and tasks always show today.',
+    'The superuser chooses which sections are shown and in what order, so you may not see every section described here.',
+    'The four coloured tiles are the red, amber and green status for the whole operation, the vehicle pool, the driver pool and the admin work. Click a tile to see what is behind it.',
+    'The period buttons (Last 7 days, Last 30 days and so on) change the accidents, costs, mileage, downtime and chart. Fleet status and tasks always show today: each panel says "today" or "in the period" beside its title.',
     'Needs attention lists the most pressing tasks. Click one to open the task list already filtered to it.',
     'The availability chart shows vehicles available (green) and out of service (red and pink). Tap or click a bar for the numbers.',
     `Drivers: worst offenders lists drivers with ${can.sensitive ? 'points, ' : ''}accidents or damage. If nobody is listed, every active driver is clear.`,
@@ -72,6 +73,7 @@ const GUIDES = () => [
   ['settings', 'Settings', 'Set up by the superuser.', [
     'Users and access: invite people, change their user type, suspend or remove them. Nobody is deleted. The "Who can do what" table is at the bottom of that section.',
     'Screens: switch off screens you are not using yet. They are hidden for everyone, and nothing is deleted.',
+    'Dashboard display: choose which sections of the dashboard are shown and in what order, for everyone.',
     'Feedback and changes: everything people have sent in, with priority, target date and status.',
     'Vehicles needed: the fewest vehicles of each type you need each day of the week. The Planner uses these.',
     'Depots: the list that vehicles and drivers choose from.',

@@ -1,14 +1,14 @@
-// Settings (superuser only). In order: users and access, which screens are switched on, the feedback log, vehicles needed,
+// Settings (superuser only). In order: users and access, which screens are switched on, the dashboard display, the feedback log, vehicles needed,
 // depots, typical fuel economy and the date format. Compliance types, templates and branding come later.
 import * as api from './api.js';
-import { state, can, ROLE_LABEL, ROLE_HINT, ROLE_ORDER, ACCESS_SUMMARY, MEMBER_STATUS_LABEL, OPTIONAL_SCREENS, screenOn } from './state.js';
+import { state, can, ROLE_LABEL, ROLE_HINT, ROLE_ORDER, ACCESS_SUMMARY, MEMBER_STATUS_LABEL, OPTIONAL_SCREENS, screenOn, DASH_SECTIONS, dashLayout } from './state.js';
 import { html, mount, on, openModal, fieldsHtml, readForm, toast, loadingHtml, emptyHtml, fmtDateShort, formatDate, DATE_FORMATS, getDateFormat, setDateFormat } from './ui.js';
 import { CATEGORY_LABEL, WEEKDAYS } from './domain.js';
 import { DEFAULT_TYPICAL_MPG, DEFAULT_MILES_PER_KWH } from './tco.js';
 import { refreshNav } from './shell.js';
 import { FB_CATEGORY, FB_STATUS, fbIsOpen, fbIsLate, fbRef, fbSort, fbStatusHtml, fbPriorityHtml, feedbackModal } from './feedback.js';
 
-const SECTIONS = [['set-users', 'Users and access'], ['set-screens', 'Screens'], ['set-feedback', 'Feedback and changes'], ['set-needs', 'Vehicles needed'], ['set-depots', 'Depots'], ['set-fuel', 'Fuel economy'], ['set-dates', 'Date format']];
+const SECTIONS = [['set-users', 'Users and access'], ['set-screens', 'Screens'], ['set-dash', 'Dashboard display'], ['set-feedback', 'Feedback and changes'], ['set-needs', 'Vehicles needed'], ['set-depots', 'Depots'], ['set-fuel', 'Fuel economy'], ['set-dates', 'Date format']];
 
 export async function settingsView(main) {
   if (!can.configure) { mount(main, html`<header class="page-head"><h1>Settings</h1></header>${emptyHtml("You don't have access to settings", 'Only the superuser can change settings.')}`); return; }
@@ -152,6 +152,18 @@ export async function settingsView(main) {
           <p><button class="btn btn-primary" type="submit">Save screens</button></p>
         </form>
       </section>
+      <section class="settings-block" id="set-dash">
+        <div class="section-head"><h2>Dashboard display</h2><a class="btn btn-sm" href="#/dashboard">Open the dashboard</a></div>
+        <p class="muted">Which sections of the dashboard are shown, and in what order, for everyone in ${state.org.name}. Give each section a number from 0 to 99: they are shown lowest number first. Untick a section to hide it. The date range at the top is always shown, and at least one section must stay on.</p>
+        <form id="dash-form" class="dash-rows" novalidate>
+          <div class="dash-row head" aria-hidden="true"><span>Order</span><span>Section</span></div>
+          ${dashLayout().map((r) => html`<div class="dash-row">
+            <input class="seq" type="text" inputmode="numeric" maxlength="2" autocomplete="off" name="seq.${r.id}" value="${String(r.seq).padStart(2, '0')}" aria-label="Order number for ${r.label}, 0 to 99">
+            <label class="check"><input type="checkbox" name="show.${r.id}" ${r.show ? 'checked' : ''}> <span><strong>${r.label}</strong> <span class="muted">${r.hint}</span></span></label></div>`)}
+          <p class="form-error" role="alert" hidden></p>
+          <p class="btn-row"><button class="btn btn-primary" type="submit">Save dashboard display</button><button class="btn" type="button" data-action="dash-standard">Fill in the standard order</button></p>
+        </form>
+      </section>
       <section class="settings-block" id="set-feedback">
         <div class="section-head"><h2>Feedback and changes</h2><button class="btn btn-primary" data-action="fb-add">Add item</button></div>
         <p class="muted">The log of feedback, errors, changes and new features. Anyone can send an item from the link at the bottom of every screen, and sees your reply under Help. Only you see the whole log and set the priority, target date and status. Items are never deleted: close one as Done or Not going ahead.</p>
@@ -197,6 +209,21 @@ export async function settingsView(main) {
       <section class="later"><h2>Coming later</h2><p class="muted">Task types and reminder timings, message templates, and branding will be managed here.</p></section>`);
     wireNeeds();
     drawFeedback();
+    main.querySelector('#dash-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const form = e.target; const err = form.querySelector('.form-error'); err.hidden = true;
+      const fail = (msg) => { err.textContent = msg; err.hidden = false; };
+      const dashboard = {};
+      for (const [id, label] of DASH_SECTIONS) {
+        const raw = String(form.elements[`seq.${id}`].value).trim();
+        if (!/^\d{1,2}$/.test(raw)) return fail(`${label}: enter a whole number from 0 to 99.`);
+        dashboard[id] = { seq: Number(raw), show: form.elements[`show.${id}`].checked };
+      }
+      if (!Object.values(dashboard).some((x) => x.show)) return fail('Leave at least one section ticked: the dashboard cannot be empty.');
+      const btn = form.querySelector('button[type="submit"]'); btn.disabled = true;
+      try { await api.saveOrgSettings({ dashboard }); toast('Dashboard display saved.'); draw(); main.querySelector('#set-dash')?.scrollIntoView?.({ block: 'start' }); }
+      catch (ex) { fail(ex.message || 'Could not save.'); btn.disabled = false; }
+    });
     main.querySelector('#screens-form').addEventListener('submit', async (e) => {
       e.preventDefault();
       const form = e.target; const btn = form.querySelector('button[type="submit"]'); btn.disabled = true;
@@ -307,6 +334,13 @@ export async function settingsView(main) {
   });
   draw();
   on(main, {
+    // puts the standard numbers back in the boxes and ticks every section; nothing changes until Save is pressed
+    'dash-standard': () => {
+      const form = main.querySelector('#dash-form');
+      for (const [id, , , std] of DASH_SECTIONS) { form.elements[`seq.${id}`].value = String(std).padStart(2, '0'); form.elements[`show.${id}`].checked = true; }
+      form.querySelector('.form-error').hidden = true;
+      toast('Standard order filled in. Save to apply it.');
+    },
     jump: (el) => main.querySelector(`#${el.dataset.to}`)?.scrollIntoView?.({ behavior: 'smooth', block: 'start' }),
     'fb-add': () => feedbackModal({ onSaved: reloadFeedback }),
     'fb-edit': (el) => feedbackModal({ item: feedback.find((i) => i.id === el.dataset.id), onSaved: reloadFeedback }),

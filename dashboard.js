@@ -1,6 +1,7 @@
 // Management dashboard: fleet status and what needs attention now, and what happened in the chosen period.
+// Which sections are shown, and in what order, is set by the superuser in Settings (Dashboard display).
 import * as api from './api.js';
-import { can, screenOn } from './state.js';
+import { can, screenOn, dashLayout } from './state.js';
 import { html, mount, plate, pill, loadingHtml, fmtDateShort, fmtMoney, fmtInt, dueText, todayStr, addDaysISO, plural } from './ui.js';
 import { UNAVAIL_REASON_LABEL, availability, taskCategory, incidentTitle, incidentCost, driverName } from './domain.js';
 import { loadPeriod, periodControlsHtml, wirePeriod, periodLabel, inPeriod, milesFromRows, eventDaysInPeriod, eventTouchesPeriod } from './insight.js';
@@ -74,7 +75,7 @@ export async function dashboardView(main) {
     const booked = live.filter((v) => v.next_booking_date && v.next_booking_date <= addDaysISO(today, 14));
     const unavailableNow = atGarage.length + offRoad.length;
     const noCover = live.filter((v) => v.status === 'active' && !v.insured_until && availability(v).key !== 'sorn');
-    const attention = [...overdue.sort((a, b) => a.days_remaining - b.days_remaining), ...dueSoon.sort((a, b) => a.days_remaining - b.days_remaining)].slice(0, 8);
+    const attention = [...overdue.sort((a, b) => a.days_remaining - b.days_remaining), ...dueSoon.sort((a, b) => a.days_remaining - b.days_remaining)].slice(0, 6);
 
     // ---- the period ----
     const inc = incidents.filter((i) => inPeriod(i.incident_date, p));
@@ -111,30 +112,31 @@ export async function dashboardView(main) {
     const t = series.totals;
 
     const fig = (label, value, sub, href, tone = '') => html`<a class="figure ${tone}" href="${href}"><span class="figure-value">${value}</span><span class="figure-label">${label}</span>${sub ? html`<span class="figure-sub">${sub}</span>` : ''}</a>`;
+    // A panel heading, with a quiet note of whether it shows today or the chosen period.
+    const head = (title, when) => html`<h2>${title}${when ? html` <span class="when">${when}</span>` : ''}</h2>`;
+    // A short list: the first few, then a link to the rest, so no panel grows long.
+    const capped = (list, max, row, moreHref) => html`<ul class="plain">${list.slice(0, max).map(row)}</ul>${list.length > max ? html`<p class="more"><a href="${moreHref}">And ${list.length - max} more</a></p>` : ''}`;
+    const outNow = [...atGarage, ...offRoad];
 
-    mount(main, html`
-      <header class="page-head"><h1>Dashboard</h1></header>
-      ${periodControlsHtml(p)}
-      <p class="muted period-note">Showing <strong>${periodLabel(p)}</strong>. Fleet status and tasks are as of today. Accidents, damage, costs and downtime cover the period.</p>
-
-      <div class="rag-tiles">
+    // ---- every section of the dashboard. half: true means it sits beside another on a wide screen ----
+    const sections = {
+      rag: { html: html`<div class="rag-tiles">
         ${ragTile('Overall', R.overall, '#/tasks')}
         ${ragTile('Vehicle pool', R.vehiclePool, screenOn('planner') ? '#/planner' : '#/vehicles?rag=1')}
         ${ragTile('Driver pool', R.driverPool, '#/drivers?rag=1')}
         ${ragTile('Admin', R.admin, '#/tasks?status=overdue')}
-      </div>
+      </div>` },
 
-      <div class="figures">
-        ${fig('Overdue tasks', overdue.length, overdue.length ? plural(overdue.filter((t) => t.is_statutory).length, 'statutory task') : 'Nothing overdue', '#/tasks?status=overdue', overdue.length ? 'tone-bad' : 'tone-good')}
+      stats: { html: html`<div class="figures">
+        ${fig('Overdue tasks', overdue.length, overdue.length ? plural(overdue.filter((t) => t.is_statutory).length, 'statutory task') : 'Nothing overdue', '#/tasks?status=overdue', overdue.length ? 'tone-bad' : '')}
         ${fig('Due soon', dueSoon.length, 'Inside the warning window', '#/tasks?status=due_soon', dueSoon.length ? 'tone-warn' : '')}
-        ${fig('Available vehicles', `${available} of ${live.length}`, unavailableNow ? `${unavailableNow} out of service` : 'None out of service', '#/vehicles', unavailableNow ? 'tone-warn' : 'tone-good')}
+        ${fig('Available vehicles', `${available} of ${live.length}`, unavailableNow ? `${unavailableNow} out of service` : 'None out of service', '#/vehicles')}
         ${fig('Accidents and damage', accidents.length + damage.length, `${plural(accidents.length, 'accident')}, ${damage.length} damage`, '#/reports?report=damage')}
         ${fig('Cost in the period', fmtMoney(running + incidentSpend), `${fmtMoney(running)} running, ${fmtMoney(incidentSpend)} incidents`, '#/reports?report=damage')}
         ${fig('Miles in the period', fmtInt(totalMiles), mileRows.length ? `${fmtInt(Math.round(totalMiles / mileRows.length))} per vehicle` : 'No readings', '#/reports?report=mileage')}
-      </div>
+      </div>` },
 
-      <div class="dash-grid">
-        <section class="dash-panel"><h2>Fleet status</h2>
+      fleet: { half: true, html: html`<section class="dash-panel">${head('Fleet status', 'today')}
           <table class="mini"><tbody>
             <tr><th>Available</th><td class="num">${available}</td></tr>
             <tr><th>At a garage</th><td class="num">${atGarage.length}</td></tr>
@@ -143,54 +145,53 @@ export async function dashboardView(main) {
             <tr><th>Booked in, next 14 days</th><td class="num">${booked.length}</td></tr>
             ${noCover.length ? html`<tr class="bad"><th>No insurance cover</th><td class="num">${noCover.length}</td></tr>` : ''}
           </tbody></table>
-          ${atGarage.length + offRoad.length ? html`<h3>Out of service now</h3><ul class="plain">${[...atGarage, ...offRoad].map(({ v }) => {
+          ${outNow.length ? html`<h3>Out of service now</h3>${capped(outNow, 5, ({ v }) => {
             const late = v.unavailable_expected_return && v.unavailable_expected_return < today;
             return html`<li>${vdot(v.id)}${link(`#/vehicles/${v.id}?tab=availability`, plate(v.registration, v.category), 'plate-link')} <span class="muted">${UNAVAIL_REASON_LABEL[v.unavailable_reason]}${v.unavailable_reason === 'off_road' ? '' : ` at ${gById.get(v.unavailable_garage_id)?.name || 'a garage'}`}, since ${fmtDateShort(v.unavailable_since)}</span>
               ${v.unavailable_expected_return ? html`<span class="${late ? 'c-overdue' : 'muted'}"> ${late ? html`<strong>Back was due</strong>` : 'Back'} ${fmtDateShort(v.unavailable_expected_return)}</span>` : ''}</li>`;
-          })}</ul>` : ''}
-          ${booked.length ? html`<h3>Booked in</h3><ul class="plain">${booked.map((v) => html`<li>${vdot(v.id)}${link(`#/vehicles/${v.id}?tab=availability`, plate(v.registration, v.category), 'plate-link')} <span class="muted">${fmtDateShort(v.next_booking_date)}</span></li>`)}</ul>` : ''}
-        </section>
-        <section class="dash-panel"><h2>Needs attention</h2>
+          }, '#/vehicles')}` : ''}
+          ${booked.length ? html`<h3>Booked in</h3>${capped(booked, 5, (v) => html`<li>${vdot(v.id)}${link(`#/vehicles/${v.id}?tab=availability`, plate(v.registration, v.category), 'plate-link')} <span class="muted">${fmtDateShort(v.next_booking_date)}</span></li>`, '#/vehicles')}` : ''}
+        </section>` },
+
+      attention: { half: true, html: html`<section class="dash-panel">${head('Needs attention', 'today')}
           ${attention.length ? html`<ul class="attn">${attention.map((t) => html`<li><a href="#/tasks?category=${taskCategory(t)}&status=${t.status}">
             <span class="attn-what">${t.vehicle_id && t.applies_to === 'vehicle' ? vdot(t.vehicle_id) : ''}${t.vehicle_id && t.applies_to === 'vehicle' ? plate(vById.get(t.vehicle_id)?.registration || t.target_label.split(' - ')[0], vById.get(t.vehicle_id)?.category) : html`<strong>${t.target_label}</strong>`}</span>
-            <span class="attn-name">${t.type_name}</span><span class="attn-due">${pill(t.status)} <span class="muted">${dueText(t.days_remaining)}</span></span></a></li>`)}</ul>
+            <span class="attn-due">${pill(t.status)}</span><span class="attn-name">${t.type_name}</span><span class="attn-when muted">${dueText(t.days_remaining)}</span></a></li>`)}</ul>
             <p><a href="#/tasks">See all ${open.length} open tasks</a></p>` : html`<p class="muted">Nothing is overdue or due soon.</p>`}
-        </section>
-      </div>
+        </section>` },
 
-      <section class="dash-panel wide avail-panel"><h2>Vehicle availability</h2>
-        <p class="muted drivers-note">Vehicles available and unavailable, by ${series.unit}${series.unit === 'day' ? '' : ' (daily averages)'}. Unavailable (red and pink) is at the bottom of each bar and available (green) is above it. HGVs are the darker, striped shade. Each block shows its number of vehicles where there is room.</p>
+      availability: { html: html`<section class="dash-panel wide avail-panel">${head('Vehicle availability', series.unit === 'day' ? 'by day' : `by ${series.unit}, daily averages`)}
         ${chartLegendHtml()}
         <div class="avail-chart" id="avail-chart"></div>
         <p class="chart-detail" id="avail-detail" aria-live="polite">Tap or click a bar for the numbers.</p>
         ${t.vehicleDays ? html`<p class="chart-summary"><strong>${t.pct}%</strong> of vehicle-days were available${t.pctVan != null && t.pctHgv != null ? html` (vans ${t.pctVan}%, HGVs ${t.pctHgv}%)` : ''}. <strong>${fmtInt(Math.round(t.unavailableDays))}</strong> vehicle-days out of service.</p>` : html`<p class="muted">There are no vehicles to show for this period.</p>`}
-        <details class="chart-numbers"><summary>Show the numbers</summary>${numbersTableHtml(series)}</details>
-      </section>
+        <details class="chart-numbers"><summary>Show the numbers</summary>
+          <p class="muted">Out of service (red and pink) is at the bottom of each bar and available (green) is above it. HGVs are the darker, striped shade.</p>${numbersTableHtml(series)}</details>
+      </section>` },
 
-      <div class="dash-grid">
-        <section class="dash-panel"><h2>Accidents, damage and fines</h2>
+      incidents: { half: true, html: html`<section class="dash-panel">${head('Accidents, damage and fines', 'in the period')}
           <table class="mini"><tbody>
             <tr><th>Accidents</th><td class="num">${accidents.length}</td></tr><tr><th>Other damage</th><td class="num">${damage.length}</td></tr><tr><th>Fines</th><td class="num">${fines.length}</td></tr>
-            <tr><th>Repair costs</th><td class="num">${fmtMoney(repair)}</td></tr><tr><th>Excess paid</th><td class="num">${fmtMoney(excess)}</td></tr>
-            <tr><th>Paid by insurers</th><td class="num">${fmtMoney(insurerPaid)}</td></tr><tr><th>Cost to other parties</th><td class="num">${fmtMoney(third)}</td></tr>
-            <tr><th>Fines</th><td class="num">${fmtMoney(fineTotal)}</td></tr>
             <tr class="total"><th>Cost to the company, before insurers</th><td class="num">${fmtMoney(incidentSpend)}</td></tr>
           </tbody></table>
-          ${inc.length ? html`<h3>Most recent</h3><ul class="plain">${inc.slice(0, 5).map((i) => html`<li>${link(`#/incidents/${i.id}`, `${fmtDateShort(i.incident_date)} ${incidentTitle(i)}`)} ${i.vehicle_id && vById.get(i.vehicle_id) ? html`${vdot(i.vehicle_id)}${plate(vById.get(i.vehicle_id).registration, vById.get(i.vehicle_id).category)}` : ''}
-            ${dById.get(i.driver_id) ? ddot(i.driver_id) : ''}${dById.get(i.driver_id) ? link(`#/drivers/${i.driver_id}`, driverName(dById.get(i.driver_id))) : html`<span class="muted">${i.driver_id ? 'Archived driver' : 'No driver recorded'}</span>`} <span class="muted">${incidentCost(i) ? fmtMoney(incidentCost(i)) : ''}</span></li>`)}</ul>` : html`<p class="muted">Nothing recorded in this period.</p>`}
+          ${inc.length ? html`<details class="dash-more"><summary>How the cost is made up</summary><table class="mini"><tbody>
+            <tr><th>Repair costs</th><td class="num">${fmtMoney(repair)}</td></tr><tr><th>Cost to other parties</th><td class="num">${fmtMoney(third)}</td></tr><tr><th>Fines</th><td class="num">${fmtMoney(fineTotal)}</td></tr>
+            <tr><th>Excess paid</th><td class="num">${fmtMoney(excess)}</td></tr><tr><th>Paid by insurers</th><td class="num">${fmtMoney(insurerPaid)}</td></tr>
+          </tbody></table></details>
+          <h3>Most recent</h3>${capped(inc, 3, (i) => html`<li>${link(`#/incidents/${i.id}`, `${fmtDateShort(i.incident_date)} ${incidentTitle(i)}`)} ${i.vehicle_id && vById.get(i.vehicle_id) ? html`${vdot(i.vehicle_id)}${plate(vById.get(i.vehicle_id).registration, vById.get(i.vehicle_id).category)}` : ''}
+            ${dById.get(i.driver_id) ? ddot(i.driver_id) : ''}${dById.get(i.driver_id) ? link(`#/drivers/${i.driver_id}`, driverName(dById.get(i.driver_id))) : html`<span class="muted">${i.driver_id ? 'Archived driver' : 'No driver recorded'}</span>`} <span class="muted">${incidentCost(i) ? fmtMoney(incidentCost(i)) : ''}</span></li>`, '#/incidents')}` : html`<p class="muted">Nothing recorded in this period.</p>`}
           ${linkRow([['#/reports?report=damage', 'Vehicle damage report'], ['#/reports?report=accidents', 'Accidents report']])}
-        </section>
-        <section class="dash-panel"><h2>Downtime and garages</h2>
+        </section>` },
+
+      downtime: { half: true, html: html`<section class="dash-panel">${head('Downtime and garages', 'in the period')}
           <table class="mini"><tbody><tr><th>Garage visits</th><td class="num">${garageVisits.length}</td></tr><tr><th>Vehicle-days out of service</th><td class="num">${lostDays}</td></tr>
             <tr><th>Vehicles affected</th><td class="num">${new Set(touched.map((e) => e.vehicle_id)).size}</td></tr></tbody></table>
-          ${garageVisits.length ? html`<h3>Visits</h3><ul class="plain">${garageVisits.slice(0, 5).map((e) => html`<li>${vById.get(e.vehicle_id) ? html`${vdot(e.vehicle_id)}${plate(vById.get(e.vehicle_id).registration, vById.get(e.vehicle_id).category)}` : ''} <span class="muted">${UNAVAIL_REASON_LABEL[e.reason]} at ${gById.get(e.garage_id)?.name || 'a garage'}, ${fmtDateShort(e.from_date)}</span></li>`)}</ul>` : ''}
+          ${garageVisits.length ? html`<h3>Visits</h3>${capped(garageVisits, 3, (e) => html`<li>${vById.get(e.vehicle_id) ? html`${vdot(e.vehicle_id)}${plate(vById.get(e.vehicle_id).registration, vById.get(e.vehicle_id).category)}` : ''} <span class="muted">${UNAVAIL_REASON_LABEL[e.reason]} at ${gById.get(e.garage_id)?.name || 'a garage'}, ${fmtDateShort(e.from_date)}</span></li>`, '#/reports?report=status')}` : ''}
           ${linkRow([['#/reports?report=status', 'Vehicle status report'], ['#/garages', 'Garages']])}
-        </section>
-      </div>
+        </section>` },
 
-      <section class="dash-panel wide"><h2>Drivers: worst offenders</h2>
-        <p class="drivers-count"><strong>${driversLine}</strong>${offenders.length > DRIVERS_SHOWN ? html` <button type="button" class="link" id="drivers-all">${allOffenders ? `Show the ${DRIVERS_SHOWN} worst` : `Show all ${offenders.length}`}</button>` : ''}</p>
-        ${offenders.length ? html`<p class="muted drivers-note">Ranked by ${can.sensitive ? 'points on the licence now, then by ' : ''}accidents and damage together in the period.</p>` : ''}
+      drivers: { html: html`<section class="dash-panel wide">${head('Drivers: worst offenders')}
+        <p class="drivers-count">${driversLine}${offenders.length > DRIVERS_SHOWN ? html` <button type="button" class="link" id="drivers-all">${allOffenders ? `Show the ${DRIVERS_SHOWN} worst` : `Show all ${offenders.length}`}</button>` : ''}</p>
         ${shown.length ? html`<table class="grid keep compact drivers-summary"><thead><tr><th>Driver</th>${can.sensitive ? html`<th class="num">Points</th>` : ''}<th class="num">Accidents</th><th class="num">Damage</th><th class="num">Total</th></tr></thead><tbody>
           ${shown.map((r) => html`<tr>
             <td data-label="Driver"><span class="with-rag">${ddot(r.d.id)}${link(`#/drivers/${r.d.id}`, driverName(r.d))}</span></td>
@@ -199,9 +200,26 @@ export async function dashboardView(main) {
             <td data-label="Damage" class="num">${r.damage || html`<span class="muted">0</span>`}</td>
             <td data-label="Total" class="num">${r.combined ? html`<strong>${r.combined}</strong>` : html`<span class="muted">0</span>`}</td></tr>`)}
         </tbody></table>
-        ` : ''}
+        <p class="muted drivers-note">${can.sensitive ? 'Points are on the licence now. ' : ''}Accidents and damage are for the period.</p>` : ''}
         <p><a href="#/drivers">All drivers</a></p>
-      </section>`);
+      </section>` },
+    };
+
+    // The sections the superuser has left on, in the order set in Settings. Half-width panels that follow one another
+    // are laid out side by side; one on its own takes the full width.
+    const parts = []; let row = [];
+    const flush = () => { if (row.length) parts.push(html`<div class="dash-grid">${row}</div>`); row = []; };
+    for (const { id } of dashLayout().filter((x) => x.show)) {
+      const sec = sections[id]; if (!sec) continue;
+      if (sec.half) row.push(sec.html); else { flush(); parts.push(sec.html); }
+    }
+    flush();
+
+    mount(main, html`
+      <header class="page-head"><h1>Dashboard</h1></header>
+      ${periodControlsHtml(p)}
+      <p class="muted period-note">Showing <strong>${periodLabel(p)}</strong></p>
+      <div class="dash">${parts}</div>`);
     wirePeriod(main, p, onPeriod);
     main.querySelector('#drivers-all')?.addEventListener('click', () => { allOffenders = !allOffenders; const y = window.scrollY; render(); window.scrollTo?.(0, y); });
     drawChart(series);

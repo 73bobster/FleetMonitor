@@ -30,7 +30,7 @@ export const ACCESS_SUMMARY = [
   ['Audit log', ['View', 'View', 'None', 'None']],
   ['Help, and sending feedback (each person sees what they sent and the reply)', ['Full', 'Full', 'Full', 'Full']],
   ['Feedback log: see everything sent in, set priority, target date and status', ['Full', 'None', 'None', 'None']],
-  ['Settings: vehicles needed, depots, users, screens, date format, typical fuel economy', ['Full', 'None', 'None', 'None']],
+  ['Settings: users, screens, dashboard display, vehicles needed, depots, typical fuel economy, date format', ['Full', 'None', 'None', 'None']],
 ];
 // Screens the superuser can switch off for everyone (Settings, Screens). The rest are always on: the app cannot be used
 // without them. Switching a screen off only hides it: nothing is deleted and every change is still audited.
@@ -48,6 +48,32 @@ export const hiddenScreens = () => { const h = state.org?.settings?.hidden_scree
 export const screenOn = (id) => !hiddenScreens().includes(id);
 // The screen a link like "#/costs/123?tab=x" belongs to.
 export const screenOfHref = (href) => (/^#\/([a-z]+)/.exec(href || '') || [])[1] || '';
+
+// The sections of the dashboard, with the standard order number of each. The superuser can hide a section or change
+// its number (Settings, Dashboard display): sections are shown lowest number first. The date range at the top is not a
+// section and is always shown. organisations.settings.dashboard holds { id: { seq, show } }.
+export const DASH_SECTIONS = [
+  ['rag', 'Red, amber, green status', 'The four coloured tiles: overall, vehicle pool, driver pool and admin.', 10],
+  ['stats', 'Key figures', 'Overdue tasks, due soon, available vehicles, accidents and damage, cost and miles.', 20],
+  ['fleet', 'Fleet status', 'How many vehicles are available, at a garage or off the road today, and which.', 30],
+  ['attention', 'Needs attention', 'The most pressing overdue and due-soon tasks.', 40],
+  ['availability', 'Vehicle availability', 'The chart of vehicles available and out of service over the period.', 50],
+  ['incidents', 'Accidents, damage and fines', 'Counts and costs for the period, and the most recent.', 60],
+  ['downtime', 'Downtime and garages', 'Garage visits and vehicle-days out of service in the period.', 70],
+  ['drivers', 'Drivers: worst offenders', 'Drivers with points, accidents or damage.', 80],
+];
+// Every section in the order it is shown, each with { id, label, hint, seq, show }. Anything missing or not valid in the
+// saved setting falls back to the standard, and if every section were hidden the first one is shown: the dashboard is never empty.
+export function dashLayout(settings = state.org?.settings) {
+  const saved = settings?.dashboard && typeof settings.dashboard === 'object' ? settings.dashboard : {};
+  const rows = DASH_SECTIONS.map(([id, label, hint, std], i) => {
+    const one = saved[id] && typeof saved[id] === 'object' ? saved[id] : {};
+    const seq = Number.isInteger(one.seq) && one.seq >= 0 && one.seq <= 99 ? one.seq : std;
+    return { id, label, hint, std, i, seq, show: one.show !== false };
+  }).sort((a, b) => a.seq - b.seq || a.i - b.i);
+  if (!rows.some((r) => r.show)) rows[0].show = true;
+  return rows;
+}
 
 export const MEMBER_STATUS_LABEL = { active: 'Active', disabled: 'Suspended', removed: 'Removed' };
 
