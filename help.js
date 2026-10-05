@@ -70,12 +70,12 @@ const GUIDES = () => [
     'Each vehicle and driver also has its own History tab.',
   ], () => can.audit],
   ['settings', 'Settings', 'Set up by the superuser.', [
-    'Vehicles needed: the fewest vehicles of each type you need each day of the week. The Planner uses these.',
-    'Depots: the list that vehicles and drivers choose from.',
     'Users and access: invite people, change their user type, suspend or remove them. Nobody is deleted. The "Who can do what" table is at the bottom of that section.',
     'Screens: switch off screens you are not using yet. They are hidden for everyone, and nothing is deleted.',
-    'Date format, and typical fuel economy for vehicles that have no figure of their own.',
     'Feedback and changes: everything people have sent in, with priority, target date and status.',
+    'Vehicles needed: the fewest vehicles of each type you need each day of the week. The Planner uses these.',
+    'Depots: the list that vehicles and drivers choose from.',
+    'Typical fuel economy for vehicles that have no figure of their own, and the date format.',
   ], () => can.configure],
 ];
 

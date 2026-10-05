@@ -1,5 +1,5 @@
-// Settings (superuser only). Vehicles needed, depots, users and invitations, which screens are switched on, the date format,
-// typical fuel economy, and the feedback log. Compliance types, templates and branding come later.
+// Settings (superuser only). In order: users and access, which screens are switched on, the feedback log, vehicles needed,
+// depots, typical fuel economy and the date format. Compliance types, templates and branding come later.
 import * as api from './api.js';
 import { state, can, ROLE_LABEL, ROLE_HINT, ROLE_ORDER, ACCESS_SUMMARY, MEMBER_STATUS_LABEL, OPTIONAL_SCREENS, screenOn } from './state.js';
 import { html, mount, on, openModal, fieldsHtml, readForm, toast, loadingHtml, emptyHtml, fmtDateShort, formatDate, DATE_FORMATS, getDateFormat, setDateFormat } from './ui.js';
@@ -8,7 +8,7 @@ import { DEFAULT_TYPICAL_MPG, DEFAULT_MILES_PER_KWH } from './tco.js';
 import { refreshNav } from './shell.js';
 import { FB_CATEGORY, FB_STATUS, fbIsOpen, fbIsLate, fbRef, fbSort, fbStatusHtml, fbPriorityHtml, feedbackModal } from './feedback.js';
 
-const SECTIONS = [['set-needs', 'Vehicles needed'], ['set-depots', 'Depots'], ['set-users', 'Users and access'], ['set-screens', 'Screens'], ['set-dates', 'Date format'], ['set-fuel', 'Fuel economy'], ['set-feedback', 'Feedback and changes']];
+const SECTIONS = [['set-users', 'Users and access'], ['set-screens', 'Screens'], ['set-feedback', 'Feedback and changes'], ['set-needs', 'Vehicles needed'], ['set-depots', 'Depots'], ['set-fuel', 'Fuel economy'], ['set-dates', 'Date format']];
 
 export async function settingsView(main) {
   if (!can.configure) { mount(main, html`<header class="page-head"><h1>Settings</h1></header>${emptyHtml("You don't have access to settings", 'Only the superuser can change settings.')}`); return; }
@@ -116,24 +116,7 @@ export async function settingsView(main) {
     mount(main, html`
       <header class="page-head"><h1>Settings</h1></header>
       <p class="jump"><span class="muted">Go to:</span> ${SECTIONS.map(([id, label]) => html`<button type="button" class="link" data-action="jump" data-to="${id}">${label}</button>`)}</p>
-      <section class="settings-block" id="set-needs">
-        <div class="section-head"><h2>Vehicles needed</h2><a class="btn btn-sm" href="#/planner">Open the planner</a></div>
-        <p class="muted">The fewest vehicles of each type you need on the road on each day of the week, across the whole fleet. The Planner uses these numbers to flag days when too few are available. Leave a day at 0 if there is no minimum.</p>
-        ${needsHtml()}
-      </section>
-      <section id="set-depots">
-        <div class="section-head"><h2>Depots</h2><button class="btn btn-primary" data-action="add">Add depot</button></div>
-        <p class="muted">The master list of depots. Vehicles and drivers choose from this list.</p>
-        ${depots.length ? html`<table class="grid"><thead><tr><th>Depot</th><th>Address</th><th class="num">Vehicles</th><th class="num">Drivers</th><th></th></tr></thead><tbody>
-          ${depots.map((d) => { const u = usage(d.id); return html`<tr>
-            <td data-label="Depot"><strong>${d.name}</strong>${d.archived_at ? html` <span class="tag">Archived</span>` : ''}</td>
-            <td data-label="Address">${[d.address, d.postcode].filter(Boolean).join(', ')}${d.phone ? html`<div class="sub">${d.phone}</div>` : ''}</td>
-            <td data-label="Vehicles" class="num">${u.v}</td><td data-label="Drivers" class="num">${u.d}</td>
-            <td class="act"><button class="btn btn-sm" data-action="edit" data-id="${d.id}">Edit</button>
-              <button class="btn btn-sm" data-action="${d.archived_at ? 'restore' : 'archive'}" data-id="${d.id}">${d.archived_at ? 'Restore' : 'Archive'}</button></td></tr>`; })}
-        </tbody></table>` : emptyHtml('No depots yet', 'Add the sites your vehicles and drivers work from.')}
-      </section>
-      <section class="settings-block spaced-top" id="set-users">
+      <section class="settings-block" id="set-users">
         <div class="section-head"><h2>Users and access</h2><button class="btn btn-primary" data-action="invite">Invite user</button></div>
         <p class="muted">Who can sign in to ${state.org.name} and what they are allowed to do. Nobody is ever deleted: a suspended user can be reinstated, and a removed user is kept so the audit log stays complete and must be invited again to come back.</p>
         ${members.some((m) => m.status === 'removed') ? html`<p><label class="check small"><input type="checkbox" id="show-removed" ${showRemoved ? 'checked' : ''}> <span>Show removed users (${members.filter((m) => m.status === 'removed').length})</span></label></p>` : ''}
@@ -169,13 +152,27 @@ export async function settingsView(main) {
           <p><button class="btn btn-primary" type="submit">Save screens</button></p>
         </form>
       </section>
-      <section class="settings-block" id="set-dates">
-        <div class="section-head"><h2>Date format</h2></div>
-        <p class="muted">How dates are shown on every screen and in downloaded reports, for everyone in ${state.org.name}. Boxes where you pick a date follow each person's own browser settings.</p>
-        <form id="date-form" class="inline-form">
-          <div class="field"><label for="date-format">Format</label><select id="date-format" name="date_format">${DATE_FORMATS.map(([k]) => html`<option value="${k}" ${k === getDateFormat() ? 'selected' : ''}>${formatDate(new Date(), k)} (${k})</option>`)}</select></div>
-          <button class="btn btn-primary" type="submit">Save date format</button>
-        </form>
+      <section class="settings-block" id="set-feedback">
+        <div class="section-head"><h2>Feedback and changes</h2><button class="btn btn-primary" data-action="fb-add">Add item</button></div>
+        <p class="muted">The log of feedback, errors, changes and new features. Anyone can send an item from the link at the bottom of every screen, and sees your reply under Help. Only you see the whole log and set the priority, target date and status. Items are never deleted: close one as Done or Not going ahead.</p>
+        <div id="fb-block"></div>
+      </section>
+      <section class="settings-block" id="set-needs">
+        <div class="section-head"><h2>Vehicles needed</h2><a class="btn btn-sm" href="#/planner">Open the planner</a></div>
+        <p class="muted">The fewest vehicles of each type you need on the road on each day of the week, across the whole fleet. The Planner uses these numbers to flag days when too few are available. Leave a day at 0 if there is no minimum.</p>
+        ${needsHtml()}
+      </section>
+      <section class="settings-block" id="set-depots">
+        <div class="section-head"><h2>Depots</h2><button class="btn btn-primary" data-action="add">Add depot</button></div>
+        <p class="muted">The master list of depots. Vehicles and drivers choose from this list.</p>
+        ${depots.length ? html`<table class="grid"><thead><tr><th>Depot</th><th>Address</th><th class="num">Vehicles</th><th class="num">Drivers</th><th></th></tr></thead><tbody>
+          ${depots.map((d) => { const u = usage(d.id); return html`<tr>
+            <td data-label="Depot"><strong>${d.name}</strong>${d.archived_at ? html` <span class="tag">Archived</span>` : ''}</td>
+            <td data-label="Address">${[d.address, d.postcode].filter(Boolean).join(', ')}${d.phone ? html`<div class="sub">${d.phone}</div>` : ''}</td>
+            <td data-label="Vehicles" class="num">${u.v}</td><td data-label="Drivers" class="num">${u.d}</td>
+            <td class="act"><button class="btn btn-sm" data-action="edit" data-id="${d.id}">Edit</button>
+              <button class="btn btn-sm" data-action="${d.archived_at ? 'restore' : 'archive'}" data-id="${d.id}">${d.archived_at ? 'Restore' : 'Archive'}</button></td></tr>`; })}
+        </tbody></table>` : emptyHtml('No depots yet', 'Add the sites your vehicles and drivers work from.')}
       </section>
       <section class="settings-block" id="set-fuel">
         <div class="section-head"><h2>Typical fuel economy</h2><a class="btn btn-sm" href="#/costs?tab=fuel">Open fuel prices</a></div>
@@ -189,10 +186,13 @@ export async function settingsView(main) {
           <p><button class="btn btn-primary" type="submit">Save fuel economy</button></p>
         </form>
       </section>
-      <section class="settings-block" id="set-feedback">
-        <div class="section-head"><h2>Feedback and changes</h2><button class="btn btn-primary" data-action="fb-add">Add item</button></div>
-        <p class="muted">The log of feedback, errors, changes and new features. Anyone can send an item from the link at the bottom of every screen, and sees your reply under Help. Only you see the whole log and set the priority, target date and status. Items are never deleted: close one as Done or Not going ahead.</p>
-        <div id="fb-block"></div>
+      <section class="settings-block" id="set-dates">
+        <div class="section-head"><h2>Date format</h2></div>
+        <p class="muted">How dates are shown on every screen and in downloaded reports, for everyone in ${state.org.name}. Boxes where you pick a date follow each person's own browser settings.</p>
+        <form id="date-form" class="inline-form">
+          <div class="field"><label for="date-format">Format</label><select id="date-format" name="date_format">${DATE_FORMATS.map(([k]) => html`<option value="${k}" ${k === getDateFormat() ? 'selected' : ''}>${formatDate(new Date(), k)} (${k})</option>`)}</select></div>
+          <button class="btn btn-primary" type="submit">Save date format</button>
+        </form>
       </section>
       <section class="later"><h2>Coming later</h2><p class="muted">Task types and reminder timings, message templates, and branding will be managed here.</p></section>`);
     wireNeeds();
