@@ -19,6 +19,26 @@ import { outOfServiceModal, backInServiceModal, extendReturnModal, convertToOffR
 
 const opts = (o) => Object.entries(o);
 
+
+// ---- Sorting ----------------------------------------------------------------
+// The standard order is by type (lorries, vans, forklifts, then the rest), then red, amber and green, then fleet number.
+// Clicking a column heading sorts on that column instead, and clicking it again reverses it. The choice is remembered on this device only.
+const TYPE_ORDER = ['hgv', 'van', 'forklift', 'light_goods', 'bus', 'trailer', 'plant', 'car', 'other'];
+const RAG_ORDER = { red: 0, amber: 1, green: 2 };
+const TASK_ORDER = { overdue: 0, due_soon: 1, no_date: 2, upcoming: 3 };
+const SORT_KEY = 'fm:vehicles-sort';
+const SORT_LABEL = { standard: 'Type, then red / amber / green', vehicle: 'Registration', availability: 'Availability', depot: 'Depot', driver: 'Driver', insurance: 'Insurance', mileage: 'Mileage', compliance: 'Compliance' };
+function savedSort() {
+  try {
+    const x = JSON.parse(localStorage.getItem(SORT_KEY) || 'null');
+    if (x && SORT_LABEL[x.sort] && (x.dir === 1 || x.dir === -1)) return { sort: x.sort, dir: x.dir };
+  } catch { /* storage unavailable or not valid: use the standard order */ }
+  return { sort: 'standard', dir: 1 };
+}
+const rememberSort = (sort, dir) => { try { localStorage.setItem(SORT_KEY, JSON.stringify({ sort, dir })); } catch { /* storage unavailable */ } };
+const textCmp = (a, b) => String(a ?? '').localeCompare(String(b ?? ''), 'en', { numeric: true, sensitivity: 'base' });
+const rankOf = (list, k) => { const i = list.indexOf(k); return i < 0 ? list.length : i; };
+
 // ---- List ------------------------------------------------------------------
 export async function vehiclesList(main, query = {}) {
   mount(main, html`<header class="page-head"><h1>Vehicles</h1></header>${loadingHtml('Loading vehicles')}`);
@@ -27,7 +47,7 @@ export async function vehiclesList(main, query = {}) {
   const garageName = (id) => garages.find((g) => g.id === id)?.name || 'a garage';
   const driverById = new Map(drivers.map((d) => [d.id, d]));
   const depotById = new Map(depots.map((d) => [d.id, d]));
-  const ui = { q: '', depot: '', category: '', avail: '', disposed: false, archived: false, rag: query.rag === '1' };
+  const ui = { q: '', depot: '', category: '', avail: '', disposed: false, archived: false, rag: query.rag === '1', ...savedSort() };
   const groupOf = (v) => { const k = availability(v).key; return k === 'booked' ? 'available' : (k === 'sorn' || k === 'off_road_no_sorn') ? 'off_road' : k; };
 
   mount(main, html`
@@ -37,6 +57,7 @@ export async function vehiclesList(main, query = {}) {
       ${depots.length ? html`<label class="inline"><span class="sr-only">Depot</span><select id="v-depot"><option value="">All depots</option>${depots.filter((d) => !d.archived_at).map((d) => html`<option value="${d.id}">${d.name}</option>`)}</select></label>` : ''}
       <label class="inline"><span class="sr-only">Availability</span><select id="v-avail"><option value="">Any availability</option><option value="available">Available</option><option value="garage">At a garage</option><option value="off_road">Off the road</option></select></label>
       <label class="inline"><span class="sr-only">Type</span><select id="v-cat"><option value="">All types</option>${opts(CATEGORY_LABEL).map(([k, l]) => html`<option value="${k}">${l}</option>`)}</select></label>
+      <label class="inline"><span class="sr-only">Sort by</span><select id="v-sort">${opts(SORT_LABEL).map(([k, l]) => html`<option value="${k}" ${k === ui.sort ? 'selected' : ''}>Sort: ${l}</option>`)}</select></label>
       <label class="check small"><input type="checkbox" id="v-rag" ${ui.rag ? 'checked' : ''}> <span>Red and amber only</span></label>
       <label class="check small"><input type="checkbox" id="v-disposed"> <span>Include disposed</span></label>
       <label class="check small"><input type="checkbox" id="v-archived"> <span>Include archived</span></label>
@@ -62,13 +83,29 @@ export async function vehiclesList(main, query = {}) {
       (ui.disposed || v.status !== 'disposed') && (ui.archived || !v.archived_at) && (!ui.rag || ['red', 'amber'].includes(ragOf.get(v.id).level)) &&
       (!ui.depot || v.depot_id === ui.depot) && (!ui.category || v.category === ui.category) && (!ui.avail || groupOf(v) === ui.avail) &&
       (!ui.q || [v.registration, v.make, v.model, v.nickname, driverName(driverById.get(v.primary_driver_id))].join(' ').toLowerCase().includes(ui.q)));
+    const standard = (a, b) => rankOf(TYPE_ORDER, a.category) - rankOf(TYPE_ORDER, b.category)
+      || (RAG_ORDER[ragOf.get(a.id).level] ?? 3) - (RAG_ORDER[ragOf.get(b.id).level] ?? 3)
+      || textCmp(a.fleet_number, b.fleet_number) || textCmp(a.registration, b.registration);
+    const taskRank = (v) => { const w = worstStatus(tasks.filter((t) => t.vehicle_id === v.id && t.applies_to === 'vehicle')); return w ? (TASK_ORDER[w] ?? 3) : 4; };
+    const KEY = {
+      vehicle: (a, b) => textCmp(a.registration, b.registration),
+      availability: (a, b) => textCmp(availability(a).label, availability(b).label),
+      depot: (a, b) => textCmp(depotById.get(a.depot_id)?.name, depotById.get(b.depot_id)?.name),
+      driver: (a, b) => textCmp(driverName(driverById.get(a.primary_driver_id)), driverName(driverById.get(b.primary_driver_id))),
+      insurance: (a, b) => textCmp(a.insured_until || '', b.insured_until || ''),   // no cover comes first, as the most urgent
+      mileage: (a, b) => (a.latest_mileage ?? -1) - (b.latest_mileage ?? -1),
+      compliance: (a, b) => taskRank(a) - taskRank(b),
+    };
+    if (ui.sort === 'standard' || !KEY[ui.sort]) rows.sort(standard);
+    else rows.sort((a, b) => ui.dir * KEY[ui.sort](a, b) || standard(a, b));
+    const th = (key, label, cls = '') => html`<th class="${cls}" aria-sort="${ui.sort === key ? (ui.dir === 1 ? 'ascending' : 'descending') : 'none'}"><button type="button" class="sort-btn" data-sort="${key}">${label}</button></th>`;
     if (!vehicles.length) {
       mount(box, emptyHtml('No vehicles yet', 'Add your first vehicle and its compliance dates will start appearing under Tasks.',
         can.write ? html`<p><a class="btn btn-primary" href="#/vehicles/new">Add a vehicle</a></p>` : ''));
       return;
     }
     if (!rows.length) { mount(box, emptyHtml('No vehicles match', 'Try a different filter, or tick Include disposed or Include archived.')); return; }
-    mount(box, html`<table class="grid"><thead><tr><th>Vehicle</th><th>Availability</th><th>Depot</th><th>Driver</th><th>Insurance</th><th class="num">Mileage</th><th>Compliance</th></tr></thead><tbody>
+    mount(box, html`<table class="grid"><thead><tr>${th('vehicle', 'Vehicle')}${th('availability', 'Availability')}${th('depot', 'Depot')}${th('driver', 'Driver')}${th('insurance', 'Insurance')}${th('mileage', 'Mileage', 'num')}${th('compliance', 'Compliance')}</tr></thead><tbody>
       ${rows.map((v) => {
         const vt = tasks.filter((t) => t.vehicle_id === v.id && t.applies_to === 'vehicle');
         const worst = worstStatus(vt);
@@ -86,6 +123,12 @@ export async function vehiclesList(main, query = {}) {
         </tr>`;
       })}</tbody></table>`);
   }
+  const setSort = (sort, dir) => { ui.sort = sort; ui.dir = dir; rememberSort(sort, dir); main.querySelector('#v-sort').value = sort; draw(); };
+  main.querySelector('#v-sort').addEventListener('change', (e) => setSort(e.target.value, 1));
+  box.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-sort]');
+    if (b) setSort(b.dataset.sort, ui.sort === b.dataset.sort ? -ui.dir : 1);
+  });
   main.querySelector('#v-search').addEventListener('input', (e) => { ui.q = e.target.value.trim().toLowerCase(); draw(); });
   main.querySelector('#v-depot')?.addEventListener('change', (e) => { ui.depot = e.target.value; draw(); });
   main.querySelector('#v-cat').addEventListener('change', (e) => { ui.category = e.target.value; draw(); });
