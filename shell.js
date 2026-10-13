@@ -21,7 +21,9 @@ const NAV = [
   { id: 'audit', label: 'Audit log', href: '#/audit', when: () => can.audit },
   { id: 'settings', label: 'Settings', href: '#/settings', when: () => can.configure },
 ];
-const TABS = ['dashboard', 'tasks', 'vehicles', 'drivers'];
+// The bottom bar on a phone holds the first four screens in menu order; the rest are under More.
+const TAB_COUNT = 4;
+const tabs = () => visibleNav().slice(0, TAB_COUNT);
 // A screen shows in the menu if this person's user type allows it and the superuser has not switched it off.
 // The menu is in the order the superuser has set (Settings, Screens); the standard order is Dashboard, Tasks, Incidents, Service / Repair, then the rest.
 const orderedNav = () => { const at = new Map(menuLayout().map((r, i) => [r.id, i])); return [...NAV].sort((a, b) => (at.get(a.id) ?? 99) - (at.get(b.id) ?? 99)); };
@@ -76,7 +78,7 @@ export function renderShell({ onSwitchOrg, onSignOut }) {
       </aside>
       <div class="content"><header class="mobile-brand"><a class="brand-link" href="#/dashboard" aria-label="${org.name}: go to the dashboard">${logoImg(logo, org.name)}</a></header><main id="main" tabindex="-1"></main><footer class="screen-foot" id="screen-foot"></footer></div>
       <nav class="tabbar" aria-label="Main">
-        ${orderedNav().filter((n) => TABS.includes(n.id)).map((n) => navLink(n, 'tab-link'))}
+        ${tabs().map((n) => navLink(n, 'tab-link'))}
         <button type="button" class="tab-link" data-action="more">${icon('more')}<span>More</span></button>
       </nav>
     </div>`);
@@ -92,7 +94,7 @@ export function renderShell({ onSwitchOrg, onSignOut }) {
 }
 
 function openMenu(onSignOut) {
-  const rest = [...visibleNav().filter((n) => !TABS.includes(n.id)), HELP];
+  const rest = [...visibleNav().slice(TAB_COUNT), HELP];
   const dlg = openModal({
     title: 'Menu',
     hideFooter: true,
