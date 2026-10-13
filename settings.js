@@ -86,7 +86,7 @@ export async function settingsView(main) {
         <label class="inline"><span class="sr-only">Kind</span><select id="fb-category"><option value="">All kinds</option>
           ${Object.entries(FB_CATEGORY).map(([k, l]) => html`<option value="${k}" ${k === fbShow.category ? 'selected' : ''}>${l}</option>`)}</select></label>
       </div>
-      ${rows.length ? html`<table class="grid fb-table"><thead><tr><th>Ref</th><th>Raised</th><th>Kind</th><th>Priority</th><th>What and the result wanted</th><th>Target date</th><th>Status</th><th></th></tr></thead><tbody>
+      ${rows.length ? html`<table class="grid fb-table fb-log"><thead><tr><th>Ref</th><th>Raised</th><th>Kind</th><th>Priority</th><th>What and the result wanted</th><th>Target date</th><th>Status</th><th></th></tr></thead><tbody>
         ${rows.map((i) => html`<tr class="${fbIsOpen(i) ? '' : 'row-off'}">
           <td data-label="Ref">${fbRef(i)}</td>
           <td data-label="Raised"><div>${fmtDateShort(i.created_at)}<div class="sub">${i.raised_by}</div></div></td>

@@ -617,6 +617,10 @@ table.tco thead th { white-space: normal; vertical-align: bottom; }
 /* ---- Feedback log ---- */
 .fb-table td { vertical-align: top; }
 .fb-text { max-width: 62ch; white-space: pre-wrap; overflow-wrap: anywhere; }
+/* In the Settings log each item shows only a short summary: two lines for what was asked, one each for the result and
+   the reply. Open shows everything. */
+.fb-log .fb-text { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; white-space: normal; }
+.fb-log .fb-text.sub { -webkit-line-clamp: 1; line-clamp: 1; }
 .fb-status { display: inline-block; padding: 1px 8px; font-size: .75rem; font-weight: 700; border-radius: 3px; white-space: nowrap; color: var(--ink-2); background: var(--quiet-bg); }
 .fb-new { color: var(--info); background: var(--info-bg); }
 .fb-under_review, .fb-planned, .fb-in_progress { color: var(--soon); background: var(--soon-bg); }
