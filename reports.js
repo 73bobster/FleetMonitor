@@ -9,7 +9,7 @@ export const REPORTS = [
   ['damage', 'Vehicle damage', 'Damage to vehicles, including damage from accidents, with repair costs, insurer payments and time off the road.'],
   ['accidents', 'Accidents', 'Every accident in the period: who, where, fault, injuries, police and insurer details, and costs.'],
   ['mileage', 'Vehicle mileage', 'Miles driven by each vehicle in the period, from odometer readings, with lease mileage against the cap.'],
-  ['status', 'Vehicle status', 'Where every vehicle is now (available, at a garage, off the road with or without a SORN), and time out of service in the period.'],
+  ['status', 'Vehicle status', 'Where every vehicle is now (available, at a garage, off the road with or without a SORN), and time in Service / Repair in the period.'],
 ];
 const yes = (b) => (b === true ? 'Yes' : b === false ? 'No' : '');
 const totalDays = (e, today) => { const end = e.returned_on || (e.from_date > today ? e.from_date : today); return Math.max(0, Math.round((new Date(`${end}T00:00:00`) - new Date(`${e.from_date}T00:00:00`)) / 86400000)); };
@@ -85,7 +85,7 @@ export function buildReport(key, data, p, today = todayStr()) {
   const n = (k) => rows.filter((r) => r.status === k).length;
   const totals = { vehicle: `Total (${rows.length})`, days: sum(rows, 'days'), visits: sum(rows, 'visits') };
   const live = rows.filter((r) => r.status !== 'Disposed');
-  return { key, title: 'Vehicle status', subtitle: sub(`Status is as of ${fmtDateShort(today)}. Days out of service and garage visits are for the period.`),
+  return { key, title: 'Vehicle status', subtitle: sub(`Status is as of ${fmtDateShort(today)}. Days in Service / Repair and garage visits are for the period.`),
     columns: [{ key: 'vehicle', label: 'Vehicle', type: 'text', width: 10 }, { key: 'model', label: 'Make and model', type: 'text', width: 20 }, { key: 'depot', label: 'Depot', type: 'text', width: 16 }, { key: 'driver', label: 'Driver', type: 'text', width: 16 },
       { key: 'status', label: 'Status', type: 'text', width: 20 }, { key: 'where', label: 'Where and why', type: 'text', width: 30 }, { key: 'since', label: 'Since or booked for', type: 'date', width: 12 }, { key: 'expected', label: 'Expected back', type: 'date', width: 12 },
       { key: 'sorn', label: 'SORN declared', type: 'date', width: 12 }, { key: 'days', label: 'Days out in period', type: 'int', width: 8 }, { key: 'visits', label: 'Garage visits', type: 'int', width: 8 }, { key: 'insured', label: 'Insured until', type: 'date', width: 12 }],

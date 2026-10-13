@@ -4,6 +4,7 @@
 export const SCREENS = [
   ['dashboard', 'Dashboard', '1.2610051743'],
   ['tasks', 'Tasks', '1.2610041110'],
+  ['service', 'Service / Repair', '1.2610131955'],
   ['planner', 'Planner', '1.2610041214'],
   ['vehicles', 'Vehicles', '1.2610041301'],
   ['drivers', 'Drivers', '1.2610041214'],
