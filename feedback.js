@@ -75,12 +75,13 @@ export function feedbackModal({ section = '', item = null, onSaved } = {}) {
 // What one person has sent, with where it has got to. Used on the Help screen.
 export function myFeedbackHtml(items) {
   if (!items.length) return html`<p class="muted">You have not sent anything yet.</p>`;
-  return html`<table class="grid fb-table"><thead><tr><th>Ref</th><th>Sent</th><th>What</th><th>Status</th><th>Reply</th></tr></thead><tbody>
+  return html`<table class="grid fb-table fb-log"><thead><tr><th>Ref</th><th>Sent</th><th>What</th><th>Status</th><th>Reply</th><th></th></tr></thead><tbody>
     ${items.map((i) => html`<tr class="${fbIsOpen(i) ? '' : 'row-off'}">
       <td data-label="Ref">${fbRef(i)}</td>
       <td data-label="Sent">${fmtDateShort(i.created_at)}</td>
       <td data-label="What"><div class="fb-cell"><span class="tag">${FB_CATEGORY[i.category] || i.category}</span> ${i.screen ? html`<span class="muted">${i.screen}</span>` : ''}<div class="fb-text">${i.description}</div></div></td>
       <td data-label="Status"><div>${fbStatusHtml(i)}${i.target_date && fbIsOpen(i) ? html`<div class="sub">Target ${fmtDateShort(i.target_date)}</div>` : ''}</div></td>
-      <td data-label="Reply">${i.response ? html`<div class="fb-text">${i.response}</div>` : html`<span class="muted">None yet</span>`}</td></tr>`)}
+      <td data-label="Reply">${i.response ? html`<div class="fb-text">${i.response}</div>` : html`<span class="muted">None yet</span>`}</td>
+      <td class="act"><button class="btn btn-sm" data-action="fb-toggle" aria-expanded="false">Open</button></td></tr>`)}
   </tbody></table>`;
 }
