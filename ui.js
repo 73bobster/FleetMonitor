@@ -155,6 +155,8 @@ const VEH_ICONS = {
   trailer: `<path d="M5.5 5h17v11.5h-5a3 3 0 0 0-6 0h-6zM1 12.6h4.5v1.8H1z"/>${WHEEL(14.5)}`,
   plant: `<path fill-rule="evenodd" d="M4.5 4.5H11l1.3 5H19a2 2 0 0 1 2 2v3h-9.3a4.6 4.6 0 0 0-7.2-3.3zM6.2 6.2v3.3h4.4l-.9-3.3z"/><path fill-rule="evenodd" d="M7.5 11.5a4 4 0 1 0 0 8 4 4 0 0 0 0-8zm0 2.5a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3z"/><circle cx="18.5" cy="17.2" r="2.3"/>`,
 };
+// A forklift faces left: upright mast with two forks at the foot, an open overhead guard, a body and two wheels.
+VEH_ICONS.forklift = `<path d="M4 3h2v15H4zM1 16.6h5v1.6H1z"/><path d="M6 12h14a1.5 1.5 0 0 1 1.5 1.5V17H6z"/><path fill-rule="evenodd" d="M8.5 11.5v-7H18v7zM10 11.5V6h6.5v5.5z"/><circle cx="10.5" cy="17.6" r="2.4"/><circle cx="18.5" cy="17.6" r="2.4"/>`;
 VEH_ICONS.other = VEH_ICONS.van;
 export const vehIcon = (category) => (VEH_ICONS[category] ? raw(`<svg class="veh-ico veh-${category}" viewBox="0 0 24 24" role="img" aria-label="${esc(CATEGORY_LABEL[category])}"><title>${esc(CATEGORY_LABEL[category])}</title>${VEH_ICONS[category]}</svg>`) : '');
 // plate(registration) draws the plate; plate(registration, category) adds the vehicle-type icon in front of it.
