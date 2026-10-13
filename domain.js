@@ -10,9 +10,9 @@ export const STATUS_LABEL = {
 };
 export const STATUS_ORDER = ['overdue', 'due_soon', 'no_date', 'upcoming', 'snoozed', 'dismissed'];
 
-export const CATEGORY_LABEL = { car: 'Car', van: 'Van', light_goods: 'Light goods', hgv: 'HGV', bus: 'Bus', trailer: 'Trailer', plant: 'Plant', other: 'Other' };
-export const CATEGORY_PLURAL = { car: 'Cars', van: 'Vans', light_goods: 'Light goods', hgv: 'HGVs', bus: 'Buses', trailer: 'Trailers', plant: 'Plant', other: 'Other vehicles' };
-export const CATEGORY_NOUN = { car: ['car', 'cars'], van: ['van', 'vans'], light_goods: ['light goods vehicle', 'light goods vehicles'], hgv: ['HGV', 'HGVs'], bus: ['bus', 'buses'], trailer: ['trailer', 'trailers'], plant: ['plant item', 'plant items'], other: ['other vehicle', 'other vehicles'] };
+export const CATEGORY_LABEL = { car: 'Car', van: 'Van', light_goods: 'Light goods', hgv: 'HGV', bus: 'Bus', trailer: 'Trailer', plant: 'Plant', forklift: 'Forklift', other: 'Other' };
+export const CATEGORY_PLURAL = { car: 'Cars', van: 'Vans', light_goods: 'Light goods', hgv: 'HGVs', bus: 'Buses', trailer: 'Trailers', plant: 'Plant', forklift: 'Forklifts', other: 'Other vehicles' };
+export const CATEGORY_NOUN = { car: ['car', 'cars'], van: ['van', 'vans'], light_goods: ['light goods vehicle', 'light goods vehicles'], hgv: ['HGV', 'HGVs'], bus: ['bus', 'buses'], trailer: ['trailer', 'trailers'], plant: ['plant item', 'plant items'], forklift: ['forklift', 'forklifts'], other: ['other vehicle', 'other vehicles'] };
 // Days of the week, Monday first: the column in vehicle_requirements, the short name and the full name.
 export const WEEKDAYS = [['mon', 'Mon', 'Monday'], ['tue', 'Tue', 'Tuesday'], ['wed', 'Wed', 'Wednesday'], ['thu', 'Thu', 'Thursday'], ['fri', 'Fri', 'Friday'], ['sat', 'Sat', 'Saturday'], ['sun', 'Sun', 'Sunday']];
 // Due dates that need the vehicle at a garage, and the kinds of garage visit that deal with each.
