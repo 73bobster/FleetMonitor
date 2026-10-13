@@ -170,6 +170,11 @@ main:focus { outline: none; }
 .grid td { padding: 12px 16px; vertical-align: top; border-bottom: 1px solid var(--line); overflow-wrap: anywhere; }
 .grid tr:last-child td { border-bottom: 0; }
 .grid th.num { text-align: right; }
+.sort-btn { all: unset; cursor: pointer; font: inherit; color: inherit; text-transform: inherit; letter-spacing: inherit; display: inline-flex; align-items: center; gap: 4px; }
+.sort-btn:hover { text-decoration: underline; }
+.sort-btn:focus-visible { outline: 2px solid var(--focus, currentColor); outline-offset: 2px; }
+th[aria-sort="ascending"] .sort-btn::after { content: "\25B2"; font-size: .65em; }
+th[aria-sort="descending"] .sort-btn::after { content: "\25BC"; font-size: .65em; }
 .grid td.act { text-align: right; white-space: nowrap; }
 .grid .sub { margin-top: 2px; }
 
