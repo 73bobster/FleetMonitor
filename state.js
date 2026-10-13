@@ -38,12 +38,32 @@ export const ACCESS_SUMMARY = [
 export const OPTIONAL_SCREENS = [
   ['planner', 'Planner', 'Vehicles available against vehicles needed, day by day.'],
   ['incidents', 'Incidents', 'Accidents, damage and fines.'],
-  ['garages', 'Garages', 'The list of garages. Garage visits are still booked from a vehicle.'],
+  ['service', 'Service / Repair', 'Vehicles out for service or repair now, and recording a new one.'],
+  ['garages', 'Garages', 'The list of garages, with the work each one does.'],
   ['insurance', 'Insurance', 'Policies, the vehicles they cover, and claims.'],
   ['costs', 'Costs', 'Total cost of ownership and monthly fuel prices.'],
   ['reports', 'Reports', 'Damage, accidents, mileage and vehicle status reports.'],
   ['audit', 'Audit log', 'The screen only: every change is still recorded while it is hidden.'],
 ];
+// Every screen in the menu, with the standard order number of each (0 to 99, lowest first). The superuser can change the
+// numbers (Settings, Screens). Dashboard, Tasks, Vehicles, Drivers and Settings cannot be switched off but can be moved.
+// organisations.settings.screen_order holds { id: number }.
+const ALWAYS_ON = {
+  dashboard: ['Dashboard', 'The opening screen.'], tasks: ['Tasks', 'What is due, due soon or overdue.'], vehicles: ['Vehicles', 'The vehicle records.'],
+  drivers: ['Drivers', 'The driver records.'], settings: ['Settings', 'Superuser only.'],
+};
+export const MENU_STANDARD = [['dashboard', 5], ['tasks', 10], ['incidents', 15], ['service', 20], ['planner', 25], ['vehicles', 30], ['drivers', 35], ['garages', 40],
+  ['insurance', 45], ['costs', 50], ['reports', 55], ['audit', 60], ['settings', 65]];
+// Every menu screen in the order it is shown, each with { id, label, hint, std, seq, optional }. Anything missing or not valid falls back to the standard.
+export function menuLayout(settings = state.org?.settings) {
+  const saved = settings?.screen_order && typeof settings.screen_order === 'object' ? settings.screen_order : {};
+  return MENU_STANDARD.map(([id, std], i) => {
+    const opt = OPTIONAL_SCREENS.find(([k]) => k === id);
+    const [label, hint] = opt ? [opt[1], opt[2]] : ALWAYS_ON[id];
+    const seq = Number.isInteger(saved[id]) && saved[id] >= 0 && saved[id] <= 99 ? saved[id] : std;
+    return { id, label, hint, std, seq, optional: !!opt, i };
+  }).sort((a, b) => a.seq - b.seq || a.i - b.i);
+}
 export const hiddenScreens = () => { const h = state.org?.settings?.hidden_screens; return Array.isArray(h) ? h.filter((id) => OPTIONAL_SCREENS.some(([k]) => k === id)) : []; };
 export const screenOn = (id) => !hiddenScreens().includes(id);
 // The screen a link like "#/costs/123?tab=x" belongs to.
@@ -57,9 +77,9 @@ export const DASH_SECTIONS = [
   ['stats', 'Key figures', 'Overdue tasks, due soon, available vehicles, accidents and damage, cost and miles.', 20],
   ['fleet', 'Fleet status', 'How many vehicles are available, at a garage or off the road today, and which.', 30],
   ['attention', 'Needs attention', 'The most pressing overdue and due-soon tasks.', 40],
-  ['availability', 'Vehicle availability', 'The chart of vehicles available and out of service over the period.', 50],
+  ['availability', 'Vehicle availability', 'The chart of vehicles available and in Service / Repair over the period.', 50],
   ['incidents', 'Accidents, damage and fines', 'Counts and costs for the period, and the most recent.', 60],
-  ['downtime', 'Downtime and garages', 'Garage visits and vehicle-days out of service in the period.', 70],
+  ['downtime', 'Downtime and garages', 'Garage visits and vehicle-days in Service / Repair in the period.', 70],
   ['drivers', 'Drivers: worst offenders', 'Drivers with points, accidents or damage.', 80],
 ];
 // Every section in the order it is shown, each with { id, label, hint, seq, show }. Anything missing or not valid in the

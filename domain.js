@@ -73,11 +73,14 @@ export const UNAVAIL_REASON_LABEL = {
 };
 export const GARAGE_SERVICE_LABEL = {
   servicing: 'Servicing', mot: 'MOT and annual tests', tyres: 'Tyres', repairs: 'Mechanical repairs', bodywork: 'Bodywork and accident repair',
-  tacho: 'Tachograph', tail_lift: 'Tail lifts', breakdown: 'Breakdown and recovery', other: 'Other work',
+  tacho: 'Tachograph', tail_lift: 'Tail lifts', breakdown: 'Breakdown and recovery', forklift: 'Forklift servicing and repair', other: 'Other work',
 };
 const REASON_SERVICE = { servicing: 'servicing', mot: 'mot', tyres: 'tyres', repair: 'repairs', accident_repair: 'bodywork', breakdown: 'breakdown', tacho: 'tacho', tail_lift: 'tail_lift' };
 // Does this garage do the kind of work that the reason needs? (The Unknown garage never "suits": it is the fallback.)
-export const garageSuits = (g, reason) => !g.is_unknown && (reason === 'other_garage' || (g.services || []).includes(REASON_SERVICE[reason]));
+// A forklift goes to a garage that does forklift work; any other vehicle goes by the kind of work, as before.
+export const garageSuits = (g, reason, category) => !g.is_unknown && (category === 'forklift'
+  ? (g.services || []).includes('forklift')
+  : (reason === 'other_garage' || (g.services || []).includes(REASON_SERVICE[reason])));
 export const COST_CATEGORY_FOR_REASON = { servicing: 'servicing', tyres: 'tyres', accident_repair: 'accident', mot: 'other' };
 
 // Where a vehicle is right now, from a vehicle_overview row.

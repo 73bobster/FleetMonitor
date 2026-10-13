@@ -1,4 +1,4 @@
-// Taking a vehicle out of service (garage visit or off the road with a SORN), bringing it back, and the follow-up actions.
+// Service / Repair: sending a vehicle to a garage or taking it off the road with a SORN, bringing it back, and the follow-up actions.
 import * as api from './api.js';
 import { html, openModal, fieldsHtml, readForm, toast, fmtDate, fmtDateShort, todayStr, addDaysISO, formatReg, esc, raw } from './ui.js';
 import { UNAVAIL_REASON_LABEL, COST_CATEGORY_FOR_REASON, garageSuits, incidentTitle } from './domain.js';
@@ -7,10 +7,10 @@ const opts = (o) => Object.entries(o);
 const BOARD = ['servicing', 'mot', 'tyres', 'repair', 'accident_repair', 'breakdown', 'tacho', 'tail_lift', 'other_garage', 'off_road'];
 
 // Garages grouped so the right ones come first: suited to the work, other garages, then Unknown.
-function garageOptions(garages, reason, selected) {
+function garageOptions(garages, reason, selected, category) {
   const live = garages.filter((g) => !g.archived_at);
-  const suited = live.filter((g) => garageSuits(g, reason));
-  const others = live.filter((g) => !g.is_unknown && !garageSuits(g, reason));
+  const suited = live.filter((g) => garageSuits(g, reason, category));
+  const others = live.filter((g) => !g.is_unknown && !garageSuits(g, reason, category));
   const unknown = live.filter((g) => g.is_unknown);
   const o = (g) => `<option value="${esc(g.id)}"${g.id === selected ? ' selected' : ''}>${esc(g.name)}</option>`;
   const group = (label, list) => (list.length ? `<optgroup label="${esc(label)}">${list.map(o).join('')}</optgroup>` : '');
@@ -18,25 +18,32 @@ function garageOptions(garages, reason, selected) {
 }
 
 // opts: { reason, from, expectedReturn, incidentId, title, onDone }
+// Without a vehicleId the form starts with a choice of vehicle (the Service / Repair screen); with one, the vehicle is fixed.
 export async function outOfServiceModal(vehicleId, o = {}) {
-  const [v, garages, incidents] = await Promise.all([api.getVehicle(vehicleId), api.listGarages(), api.listIncidents({ vehicleId })]);
+  const [fixed, garages, incidents, fleet] = await Promise.all([vehicleId ? api.getVehicle(vehicleId) : null, api.listGarages(), api.listIncidents(), vehicleId ? null : api.listVehicles()]);
+  const pickable = (fleet || []).filter((x) => !x.archived_at && x.status !== 'disposed' && !x.unavailable_event_id);
   const damage = incidents.filter((i) => i.kind !== 'fine' && !i.repaired_on);
   const reason0 = o.reason || 'servicing';
   const specs = [
-    { name: 'reason', label: 'Why is it out of service?', type: 'select', required: true, options: BOARD.map((r) => [r, UNAVAIL_REASON_LABEL[r]]), span: 2 },
+    ...(vehicleId ? [] : [{ name: 'vehicle_id', label: 'Vehicle', type: 'select', required: true, blank: 'Choose a vehicle', span: 2,
+      options: pickable.map((x) => [x.id, [formatReg(x.registration), [x.make, x.model].filter(Boolean).join(' ')].filter(Boolean).join(' - ')]) }]),
+    { name: 'reason', label: 'Reason', type: 'select', required: true, options: BOARD.map((r) => [r, UNAVAIL_REASON_LABEL[r]]), span: 2 },
     { name: 'from_date', label: 'From', type: 'date', required: true, hint: 'A future date books the garage in.' },
     { name: 'expected_return', label: 'Expected back', type: 'date', hint: 'A task reminds you if it is not back by then.' },
     { name: 'garage_id', label: 'Garage', type: 'select', required: true, options: [] },
-    { name: 'incident_id', label: 'Linked accident or damage', type: 'select', blank: 'Not linked', options: damage.map((i) => [i.id, `${incidentTitle(i)}, ${fmtDateShort(i.incident_date)}`]) },
+    { name: 'incident_id', label: 'Linked accident or damage', type: 'select', blank: 'Not linked', options: [] },
     { name: 'location_note', label: 'Where is it?', hint: 'For example: stored at the depot.', span: 2 },
     { name: 'sorn_declared_on', label: 'SORN declared on', type: 'date', hint: 'A vehicle that is off the road must be taxed or have a SORN. Leave blank and a task will remind you to declare it.', span: 2 },
     { name: 'notes', label: 'Notes', type: 'textarea', span: 2 },
   ];
+  const chosen = (f) => fixed || fleet.find((x) => x.id === f.elements.vehicle_id?.value) || null;
   const dlg = openModal({
-    title: o.title || `Out of service: ${formatReg(v.registration)}`, submitLabel: 'Save', wide: true,
-    body: html`${fieldsHtml(specs, { reason: reason0, from_date: o.from || todayStr(), expected_return: o.expectedReturn || '', incident_id: o.incidentId || '' })}<p class="warn" id="garage-warn" role="status" hidden></p>`,
+    title: o.title || (fixed ? `Service / Repair: ${formatReg(fixed.registration)}` : 'Record a service / repair'), submitLabel: 'Save', wide: true,
+    body: html`${fieldsHtml(specs, { reason: reason0, from_date: o.from || todayStr(), expected_return: o.expectedReturn || '' })}<p class="warn" id="garage-warn" role="status" hidden></p>`,
     onSubmit: async (f) => {
       const x = readForm(f, specs);
+      const v = chosen(f);
+      if (!v) throw new Error('Choose the vehicle.');
       if (x.reason !== 'off_road' && !x.garage_id) throw new Error('Choose the garage. Use Unknown garage if you do not know.');
       if (x.reason === 'off_road' && x.from_date > todayStr()) throw new Error('A vehicle goes off the road from today or earlier. Choose a garage reason to book a future visit.');
       if (x.expected_return && x.expected_return < x.from_date) throw new Error('It cannot be back before it goes.');
@@ -55,9 +62,14 @@ export async function outOfServiceModal(vehicleId, o = {}) {
   const field = (n) => f.elements[n].closest('.field');
   const refresh = () => {
     const r = f.elements.reason.value;
+    const v = chosen(f);
     const g = f.elements.garage_id;
-    const current = g.value;
-    g.innerHTML = garageOptions(garages, r, current).s;
+    g.innerHTML = garageOptions(garages, r, g.value, v?.category).s;
+    // Only damage on the chosen vehicle can be linked to a repair.
+    const inc = f.elements.incident_id;
+    const keep = inc.value || o.incidentId || '';
+    const mine = damage.filter((i) => v && i.vehicle_id === v.id);
+    inc.innerHTML = raw(`<option value="">Not linked</option>${mine.map((i) => `<option value="${esc(i.id)}"${i.id === keep ? ' selected' : ''}>${esc(`${incidentTitle(i)}, ${fmtDateShort(i.incident_date)}`)}</option>`).join('')}`).s;
     const off = r === 'off_road';
     field('garage_id').hidden = off; field('expected_return').hidden = off; field('location_note').hidden = !off; field('sorn_declared_on').hidden = !off;
     field('incident_id').hidden = !['repair', 'accident_repair'].includes(r);
@@ -68,10 +80,13 @@ export async function outOfServiceModal(vehicleId, o = {}) {
     const box = dlg.querySelector('#garage-warn');
     const g = garages.find((x) => x.id === f.elements.garage_id.value);
     const r = f.elements.reason.value;
-    box.hidden = !(g && !g.is_unknown && r !== 'off_road' && !garageSuits(g, r));
-    if (!box.hidden) box.textContent = `${g.name} is not listed as doing this kind of work. You can still choose it. If that is wrong, update its types of work under Garages.`;
+    const v = chosen(f);
+    box.hidden = !(g && !g.is_unknown && r !== 'off_road' && !garageSuits(g, r, v?.category));
+    if (!box.hidden) box.textContent = v?.category === 'forklift' ? `${g.name} is not listed as doing forklift work. You can still choose it. If that is wrong, update its types of work under Garages.`
+      : `${g.name} is not listed as doing this kind of work. You can still choose it. If that is wrong, update its types of work under Garages.`;
   };
   f.elements.reason.addEventListener('change', refresh);
+  f.elements.vehicle_id?.addEventListener('change', refresh);
   f.elements.garage_id.addEventListener('change', warn);
   refresh();
 }

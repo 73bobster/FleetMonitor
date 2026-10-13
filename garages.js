@@ -20,14 +20,14 @@ export async function garagesView(main) {
     const rows = garages.filter((g) => ui.archived || !g.archived_at);
     mount(main, html`
       <header class="page-head"><h1>Garages</h1>${can.write ? html`<button class="btn btn-primary" data-action="edit">Add garage</button>` : ''}</header>
-      <p class="muted">The garages you use, with the work each one does. When a vehicle is out of service you choose its garage from this list, with the suitable ones first. Use Unknown garage when you do not know where it is.</p>
+      <p class="muted">The garages you use, with the work each one does. When a vehicle goes in for Service / Repair you choose its garage from this list, with the suitable ones first. Use Unknown garage when you do not know where it is.</p>
       <div class="filters"><label class="check small"><input type="checkbox" id="g-arch" ${ui.archived ? 'checked' : ''}> <span>Include archived garages</span></label></div>
       <table class="grid"><thead><tr><th>Garage</th><th>Contact</th><th>Types of work</th><th>At the garage now</th><th></th></tr></thead><tbody>
         ${rows.map((g) => {
           const there = vehicles.filter((v) => v.unavailable_garage_id === g.id && !v.archived_at && v.status !== 'disposed');
           return html`<tr>
             <td data-label="Garage"><strong>${g.name}</strong>${g.is_unknown ? html` <span class="tag">Built in</span>` : ''}${g.archived_at ? html` <span class="tag">Archived</span>` : ''}
-              ${g.address || g.postcode ? html`<div class="sub">${[g.address, g.postcode].filter(Boolean).join(', ')}</div>` : ''}${g.is_unknown && g.notes ? html`<div class="sub">${g.notes}</div>` : ''}</td>
+              ${g.address || g.postcode ? html`<div class="sub">${[g.address, g.postcode].filter(Boolean).join(', ')}</div>` : ''}${g.notes ? html`<div class="sub">${g.notes}</div>` : ''}</td>
             <td data-label="Contact">${g.contact_name || ''}${g.phone ? html`<div class="sub">${g.phone}</div>` : ''}${g.email ? html`<div class="sub"><a href="mailto:${g.email}">${g.email}</a></div>` : ''}</td>
             <td data-label="Types of work">${g.is_unknown ? '' : (g.services || []).map((s) => GARAGE_SERVICE_LABEL[s]).join(', ') || html`<span class="muted">Not set</span>`}</td>
             <td data-label="At the garage now">${there.length ? there.map((v) => html`<a class="plate-link" href="#/vehicles/${v.id}?tab=availability">${plate(v.registration, v.category)}</a> `) : html`<span class="muted">None</span>`}</td>

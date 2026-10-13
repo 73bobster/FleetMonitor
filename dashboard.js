@@ -130,7 +130,7 @@ export async function dashboardView(main) {
       stats: { html: html`<div class="figures">
         ${fig('Overdue tasks', overdue.length, overdue.length ? plural(overdue.filter((t) => t.is_statutory).length, 'statutory task') : 'Nothing overdue', '#/tasks?status=overdue', overdue.length ? 'tone-bad' : '')}
         ${fig('Due soon', dueSoon.length, 'Inside the warning window', '#/tasks?status=due_soon', dueSoon.length ? 'tone-warn' : '')}
-        ${fig('Available vehicles', `${available} of ${live.length}`, unavailableNow ? `${unavailableNow} out of service` : 'None out of service', '#/vehicles')}
+        ${fig('Available vehicles', `${available} of ${live.length}`, unavailableNow ? `${unavailableNow} in Service / Repair` : 'None in Service / Repair', '#/vehicles')}
         ${fig('Accidents and damage', accidents.length + damage.length, `${plural(accidents.length, 'accident')}, ${damage.length} damage`, '#/reports?report=damage')}
         ${fig('Cost in the period', fmtMoney(running + incidentSpend), `${fmtMoney(running)} running, ${fmtMoney(incidentSpend)} incidents`, '#/reports?report=damage')}
         ${fig('Miles in the period', fmtInt(totalMiles), mileRows.length ? `${fmtInt(Math.round(totalMiles / mileRows.length))} per vehicle` : 'No readings', '#/reports?report=mileage')}
@@ -145,7 +145,7 @@ export async function dashboardView(main) {
             <tr><th>Booked in, next 14 days</th><td class="num">${booked.length}</td></tr>
             ${noCover.length ? html`<tr class="bad"><th>No insurance cover</th><td class="num">${noCover.length}</td></tr>` : ''}
           </tbody></table>
-          ${outNow.length ? html`<h3>Out of service now</h3>${capped(outNow, 5, ({ v }) => {
+          ${outNow.length ? html`<h3>Service / Repair now</h3>${capped(outNow, 5, ({ v }) => {
             const late = v.unavailable_expected_return && v.unavailable_expected_return < today;
             return html`<li>${vdot(v.id)}${link(`#/vehicles/${v.id}?tab=availability`, plate(v.registration, v.category), 'plate-link')} <span class="muted">${UNAVAIL_REASON_LABEL[v.unavailable_reason]}${v.unavailable_reason === 'off_road' ? '' : ` at ${gById.get(v.unavailable_garage_id)?.name || 'a garage'}`}, since ${fmtDateShort(v.unavailable_since)}</span>
               ${v.unavailable_expected_return ? html`<span class="${late ? 'c-overdue' : 'muted'}"> ${late ? html`<strong>Back was due</strong>` : 'Back'} ${fmtDateShort(v.unavailable_expected_return)}</span>` : ''}</li>`;
@@ -164,9 +164,9 @@ export async function dashboardView(main) {
         ${chartLegendHtml()}
         <div class="avail-chart" id="avail-chart"></div>
         <p class="chart-detail" id="avail-detail" aria-live="polite">Tap or click a bar for the numbers.</p>
-        ${t.vehicleDays ? html`<p class="chart-summary"><strong>${t.pct}%</strong> of vehicle-days were available${t.pctVan != null && t.pctHgv != null ? html` (vans ${t.pctVan}%, HGVs ${t.pctHgv}%)` : ''}. <strong>${fmtInt(Math.round(t.unavailableDays))}</strong> vehicle-days out of service.</p>` : html`<p class="muted">There are no vehicles to show for this period.</p>`}
+        ${t.vehicleDays ? html`<p class="chart-summary"><strong>${t.pct}%</strong> of vehicle-days were available${t.pctVan != null && t.pctHgv != null ? html` (vans ${t.pctVan}%, HGVs ${t.pctHgv}%)` : ''}. <strong>${fmtInt(Math.round(t.unavailableDays))}</strong> vehicle-days in Service / Repair.</p>` : html`<p class="muted">There are no vehicles to show for this period.</p>`}
         <details class="chart-numbers"><summary>Show the numbers</summary>
-          <p class="muted">Out of service (red and pink) is at the bottom of each bar and available (green) is above it. HGVs are the darker, striped shade.</p>${numbersTableHtml(series)}</details>
+          <p class="muted">Service / Repair (red and pink) is at the bottom of each bar and available (green) is above it. HGVs are the darker, striped shade.</p>${numbersTableHtml(series)}</details>
       </section>` },
 
       incidents: { half: true, html: html`<section class="dash-panel">${head('Accidents, damage and fines', 'in the period')}
@@ -184,7 +184,7 @@ export async function dashboardView(main) {
         </section>` },
 
       downtime: { half: true, html: html`<section class="dash-panel">${head('Downtime and garages', 'in the period')}
-          <table class="mini"><tbody><tr><th>Garage visits</th><td class="num">${garageVisits.length}</td></tr><tr><th>Vehicle-days out of service</th><td class="num">${lostDays}</td></tr>
+          <table class="mini"><tbody><tr><th>Garage visits</th><td class="num">${garageVisits.length}</td></tr><tr><th>Vehicle-days in Service / Repair</th><td class="num">${lostDays}</td></tr>
             <tr><th>Vehicles affected</th><td class="num">${new Set(touched.map((e) => e.vehicle_id)).size}</td></tr></tbody></table>
           ${garageVisits.length ? html`<h3>Visits</h3>${capped(garageVisits, 3, (e) => html`<li>${vById.get(e.vehicle_id) ? html`${vdot(e.vehicle_id)}${plate(vById.get(e.vehicle_id).registration, vById.get(e.vehicle_id).category)}` : ''} <span class="muted">${UNAVAIL_REASON_LABEL[e.reason]} at ${gById.get(e.garage_id)?.name || 'a garage'}, ${fmtDateShort(e.from_date)}</span></li>`, '#/reports?report=status')}` : ''}
           ${linkRow([['#/reports?report=status', 'Vehicle status report'], ['#/garages', 'Garages']])}

@@ -1,7 +1,7 @@
 // Settings (superuser only). In order: users and access, which screens are switched on, the dashboard display, the feedback log, vehicles needed,
 // depots, typical fuel economy and the date format. Compliance types, templates and branding come later.
 import * as api from './api.js';
-import { state, can, ROLE_LABEL, ROLE_HINT, ROLE_ORDER, ACCESS_SUMMARY, MEMBER_STATUS_LABEL, OPTIONAL_SCREENS, screenOn, DASH_SECTIONS, dashLayout } from './state.js';
+import { state, can, ROLE_LABEL, ROLE_HINT, ROLE_ORDER, ACCESS_SUMMARY, MEMBER_STATUS_LABEL, OPTIONAL_SCREENS, screenOn, DASH_SECTIONS, dashLayout, menuLayout, MENU_STANDARD } from './state.js';
 import { html, mount, on, openModal, fieldsHtml, readForm, toast, loadingHtml, emptyHtml, fmtDateShort, formatDate, DATE_FORMATS, getDateFormat, setDateFormat } from './ui.js';
 import { CATEGORY_LABEL, WEEKDAYS } from './domain.js';
 import { DEFAULT_TYPICAL_MPG, DEFAULT_MILES_PER_KWH } from './tco.js';
@@ -146,10 +146,15 @@ export async function settingsView(main) {
       </section>
       <section class="settings-block" id="set-screens">
         <div class="section-head"><h2>Screens</h2></div>
-        <p class="muted">Untick a screen to switch it off. It is then hidden for everyone in ${state.org.name}, including you: it leaves the menu, and links to it are taken away. Nothing is deleted, the records behind it are kept, and every change is still recorded in the audit log. Dashboard, Tasks, Vehicles, Drivers, Settings and Help are always on.</p>
-        <form id="screens-form" class="screen-switches">
-          ${OPTIONAL_SCREENS.map(([id, label, hint]) => html`<label class="check screen-switch"><input type="checkbox" name="${id}" ${screenOn(id) ? 'checked' : ''}> <span><strong>${label}</strong> <span class="muted">${hint}</span></span></label>`)}
-          <p><button class="btn btn-primary" type="submit">Save screens</button></p>
+        <p class="muted">The menu, for everyone in ${state.org.name}. Give each screen a number from 0 to 99: they are shown in the menu lowest number first. Untick a screen to switch it off. It is then hidden for everyone, including you: it leaves the menu, and links to it are taken away. Nothing is deleted, the records behind it are kept, and every change is still recorded in the audit log. Dashboard, Tasks, Vehicles, Drivers and Settings cannot be switched off, but can be moved. Help is always last.</p>
+        <form id="screens-form" class="dash-rows" novalidate>
+          <div class="dash-row head" aria-hidden="true"><span>Order</span><span>Screen</span></div>
+          ${menuLayout().map((r) => html`<div class="dash-row">
+            <input class="seq" type="text" inputmode="numeric" maxlength="2" autocomplete="off" name="seq.${r.id}" value="${String(r.seq).padStart(2, '0')}" aria-label="Order number for ${r.label}, 0 to 99">
+            ${r.optional ? html`<label class="check"><input type="checkbox" name="${r.id}" ${screenOn(r.id) ? 'checked' : ''}> <span><strong>${r.label}</strong> <span class="muted">${r.hint}</span></span></label>`
+              : html`<div class="check"><span><strong>${r.label}</strong> <span class="tag">Always on</span> <span class="muted">${r.hint}</span></span></div>`}</div>`)}
+          <p class="form-error" role="alert" hidden></p>
+          <p class="btn-row"><button class="btn btn-primary" type="submit">Save screens</button><button class="btn" type="button" data-action="screens-standard">Fill in the standard order</button></p>
         </form>
       </section>
       <section class="settings-block" id="set-dash">
@@ -226,10 +231,18 @@ export async function settingsView(main) {
     });
     main.querySelector('#screens-form').addEventListener('submit', async (e) => {
       e.preventDefault();
-      const form = e.target; const btn = form.querySelector('button[type="submit"]'); btn.disabled = true;
+      const form = e.target; const err = form.querySelector('.form-error'); err.hidden = true;
+      const fail = (msg) => { err.textContent = msg; err.hidden = false; };
+      const screen_order = {};
+      for (const r of menuLayout()) {
+        const raw = String(form.elements[`seq.${r.id}`].value).trim();
+        if (!/^\d{1,2}$/.test(raw)) return fail(`${r.label}: enter a whole number from 0 to 99.`);
+        screen_order[r.id] = Number(raw);
+      }
+      const btn = form.querySelector('button[type="submit"]'); btn.disabled = true;
       const off = OPTIONAL_SCREENS.map(([id]) => id).filter((id) => !form.elements[id].checked);
-      try { await api.saveOrgSettings({ hidden_screens: off }); refreshNav(); toast(off.length ? `Screens saved. ${off.length} switched off.` : 'Screens saved. All switched on.'); draw(); main.querySelector('#set-screens')?.scrollIntoView?.({ block: 'start' }); }
-      catch (ex) { toast(ex.message || 'Could not save.', 'error'); btn.disabled = false; }
+      try { await api.saveOrgSettings({ hidden_screens: off, screen_order }); refreshNav(); toast(off.length ? `Screens saved. ${off.length} switched off.` : 'Screens saved. All switched on.'); draw(); main.querySelector('#set-screens')?.scrollIntoView?.({ block: 'start' }); }
+      catch (ex) { fail(ex.message || 'Could not save.'); btn.disabled = false; }
     });
     main.querySelector('#mpg-form').addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -335,6 +348,13 @@ export async function settingsView(main) {
   draw();
   on(main, {
     // puts the standard numbers back in the boxes and ticks every section; nothing changes until Save is pressed
+    // puts the standard menu numbers back in the boxes and ticks every screen; nothing changes until Save is pressed
+    'screens-standard': () => {
+      const form = main.querySelector('#screens-form');
+      for (const [id, std] of MENU_STANDARD) { form.elements[`seq.${id}`].value = String(std).padStart(2, '0'); if (form.elements[id]) form.elements[id].checked = true; }
+      form.querySelector('.form-error').hidden = true;
+      toast('Standard order filled in. Save to apply it.');
+    },
     'dash-standard': () => {
       const form = main.querySelector('#dash-form');
       for (const [id, , , std] of DASH_SECTIONS) { form.elements[`seq.${id}`].value = String(std).padStart(2, '0'); form.elements[`show.${id}`].checked = true; }

@@ -17,6 +17,7 @@ import { dashboardView } from './dashboard.js';
 import { reportsView } from './reports.js';
 import { garagesView } from './garages.js';
 import { plannerView } from './planner.js';
+import { serviceView } from './service.js';
 import { costsView, costDetailView } from './costs.js';
 import { helpView } from './help.js';
 
@@ -50,6 +51,7 @@ const route = (pattern, section, handler) => addRoute(pattern, section, (m, p, q
 route('/dashboard', 'dashboard', (m) => dashboardView(m));
 route('/tasks', 'tasks', (m, p, q) => tasksView(m, q));
 route('/planner', 'planner', (m) => plannerView(m));
+route('/service', 'service', (m) => serviceView(m));
 route('/garages', 'garages', (m) => garagesView(m));
 route('/vehicles', 'vehicles', (m, p, q) => vehiclesList(m, q));
 route('/vehicles/new', 'vehicles', (m) => vehicleForm(m, { id: 'new' }));

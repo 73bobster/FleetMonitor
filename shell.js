@@ -1,6 +1,6 @@
 // The signed-in frame: sidebar on desktop, tab bar on mobile, brand colours, org switcher.
 import { html, mount, on, icon, openModal, closeModal, logoImg, wireLogos, setDateFormat } from './ui.js';
-import { state, can, ROLE_LABEL, screenOn } from './state.js';
+import { state, can, ROLE_LABEL, screenOn, menuLayout } from './state.js';
 import * as api from './api.js';
 import { dispatch } from './router.js';
 import { screenLabel, versionOf } from './versions.js';
@@ -9,10 +9,11 @@ import { feedbackModal } from './feedback.js';
 const NAV = [
   { id: 'dashboard', label: 'Dashboard', href: '#/dashboard' },
   { id: 'tasks', label: 'Tasks', href: '#/tasks' },
+  { id: 'incidents', label: 'Incidents', href: '#/incidents' },
+  { id: 'service', label: 'Service / Repair', href: '#/service' },
   { id: 'planner', label: 'Planner', href: '#/planner' },
   { id: 'vehicles', label: 'Vehicles', href: '#/vehicles' },
   { id: 'drivers', label: 'Drivers', href: '#/drivers' },
-  { id: 'incidents', label: 'Incidents', href: '#/incidents' },
   { id: 'garages', label: 'Garages', href: '#/garages' },
   { id: 'insurance', label: 'Insurance', href: '#/insurance' },
   { id: 'costs', label: 'Costs', href: '#/costs' },
@@ -22,7 +23,9 @@ const NAV = [
 ];
 const TABS = ['dashboard', 'tasks', 'vehicles', 'drivers'];
 // A screen shows in the menu if this person's user type allows it and the superuser has not switched it off.
-const visibleNav = () => NAV.filter((n) => (!n.when || n.when()) && screenOn(n.id));
+// The menu is in the order the superuser has set (Settings, Screens); the standard order is Dashboard, Tasks, Incidents, Service / Repair, then the rest.
+const orderedNav = () => { const at = new Map(menuLayout().map((r, i) => [r.id, i])); return [...NAV].sort((a, b) => (at.get(a.id) ?? 99) - (at.get(b.id) ?? 99)); };
+const visibleNav = () => orderedNav().filter((n) => (!n.when || n.when()) && screenOn(n.id));
 const HELP = { id: 'help', label: 'Help', href: '#/help' };
 let current = '';      // the screen being shown, for the version at the bottom and for feedback
 let badgeCount = 0;
@@ -73,7 +76,7 @@ export function renderShell({ onSwitchOrg, onSignOut }) {
       </aside>
       <div class="content"><header class="mobile-brand"><a class="brand-link" href="#/dashboard" aria-label="${org.name}: go to the dashboard">${logoImg(logo, org.name)}</a></header><main id="main" tabindex="-1"></main><footer class="screen-foot" id="screen-foot"></footer></div>
       <nav class="tabbar" aria-label="Main">
-        ${NAV.filter((n) => TABS.includes(n.id)).map((n) => navLink(n, 'tab-link'))}
+        ${orderedNav().filter((n) => TABS.includes(n.id)).map((n) => navLink(n, 'tab-link'))}
         <button type="button" class="tab-link" data-action="more">${icon('more')}<span>More</span></button>
       </nav>
     </div>`);

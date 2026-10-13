@@ -13,7 +13,7 @@ const GUIDES = () => [
     'The four coloured tiles are the red, amber and green status for the whole operation, the vehicle pool, the driver pool and the admin work. Click a tile to see what is behind it.',
     'The period buttons (Last 7 days, Last 30 days and so on) change the accidents, costs, mileage, downtime and chart. Fleet status and tasks always show today: each panel says "today" or "in the period" beside its title.',
     'Needs attention lists the most pressing tasks. Click one to open the task list already filtered to it.',
-    'The availability chart shows vehicles available (green) and out of service (red and pink). Tap or click a bar for the numbers.',
+    'The availability chart shows vehicles available (green) and in Service / Repair (red and pink). Tap or click a bar for the numbers.',
     `Drivers: worst offenders lists drivers with ${can.sensitive ? 'points, ' : ''}accidents or damage. If nobody is listed, every active driver is clear.`,
   ]],
   ['tasks', 'Tasks', 'Everything that has a date: MOT, road tax, services, inspections, licence checks, insurance renewals, fines to pay. Grouped by how urgent it is.', [
@@ -32,7 +32,7 @@ const GUIDES = () => [
     'The coloured dot beside a number plate is that vehicle\'s status. Tick "Red and amber only" to see just the ones that need attention.',
     'Search by registration, make or driver, or filter by depot, availability and type. Tick "Include disposed" to see vehicles that have left the fleet.',
     'Click a vehicle to open it. The tabs across the top hold its compliance dates, drivers, insurance, availability, incidents, costs, documents and mileage readings.',
-    can.write ? 'To send a vehicle to a garage or take it off the road, open it and choose "Out of service or book a visit" on the Availability tab. Choose "Back in service" when it returns.' : '',
+    can.write ? 'To send a vehicle to a garage or take it off the road, choose Service / Repair in the menu and then "Record a service / repair", or open the vehicle and choose Service / Repair. Choose "Back in service" when it returns.' : '',
     can.write ? 'Add mileage on the Readings tab and costs on the Costs tab. Regular readings make the mileage and fuel figures accurate.' : '',
     can.write ? 'When a vehicle leaves the fleet choose Dispose. If it comes back, open it and choose "Bring back into the fleet". Its history is kept.' : '',
   ]],
