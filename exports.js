@@ -20,7 +20,7 @@ export function crc32(bytes) {
   for (let i = 0; i < bytes.length; i++) c = CRC_TABLE[(c ^ bytes[i]) & 0xFF] ^ (c >>> 8);
   return (c ^ 0xFFFFFFFF) >>> 0;
 }
-function zipStore(files) {
+export function zipStore(files) {
   const now = new Date();
   const dosTime = (now.getHours() << 11) | (now.getMinutes() << 5) | (now.getSeconds() >> 1);
   const dosDate = ((now.getFullYear() - 1980) << 9) | ((now.getMonth() + 1) << 5) | now.getDate();
@@ -43,15 +43,15 @@ function zipStore(files) {
 }
 
 // ---- XLSX ------------------------------------------------------------------------------
-const xml = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])).replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '');
-const colName = (i) => { let n = i + 1; let s = ''; while (n > 0) { const m = (n - 1) % 26; s = String.fromCharCode(65 + m) + s; n = Math.floor((n - m) / 26); } return s; };
-const serial = (iso) => { const [y, m, d] = String(iso).slice(0, 10).split('-').map(Number); return (Date.UTC(y, m - 1, d) - Date.UTC(1899, 11, 30)) / 86400000; };
+export const xml = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])).replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '');
+export const colName = (i) => { let n = i + 1; let s = ''; while (n > 0) { const m = (n - 1) % 26; s = String.fromCharCode(65 + m) + s; n = Math.floor((n - m) / 26); } return s; };
+export const serial = (iso) => { const [y, m, d] = String(iso).slice(0, 10).split('-').map(Number); return (Date.UTC(y, m - 1, d) - Date.UTC(1899, 11, 30)) / 86400000; };
 
 // Cell styles (indexes into cellXfs in STYLES below)
-const S = { title: 1, header: 2, text: 3, date: 4, money: 5, int: 6, number: 7, totalText: 8, totalMoney: 9, totalInt: 10, totalNumber: 11, note: 12 };
+export const S = { title: 1, header: 2, text: 3, date: 4, money: 5, int: 6, number: 7, totalText: 8, totalMoney: 9, totalInt: 10, totalNumber: 11, note: 12 };
 // The organisation's date format as an Excel number format, so date cells stay real dates that sort and filter.
 const EXCEL_DATE = { 'dd-Mmm-yy': 'dd\\-mmm\\-yy', 'dd Mmm yyyy': 'd\\ mmm\\ yyyy', 'dd/mm/yyyy': 'dd/mm/yyyy', 'dd/mm/yy': 'dd/mm/yy', 'mm/dd/yyyy': 'mm/dd/yyyy', 'yyyy-mm-dd': 'yyyy\\-mm\\-dd' };
-const stylesXml = () => `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+export const stylesXml = () => `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
 <numFmts count="3"><numFmt numFmtId="164" formatCode="${EXCEL_DATE[getDateFormat()] || EXCEL_DATE['dd-Mmm-yy']}"/><numFmt numFmtId="165" formatCode="&quot;£&quot;#,##0.00"/><numFmt numFmtId="166" formatCode="#,##0.0"/></numFmts>
 <fonts count="5"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Calibri"/></font><font><b/><sz val="14"/><name val="Calibri"/></font><font><i/><sz val="10"/><color rgb="FF555555"/><name val="Calibri"/></font></fonts>
@@ -76,7 +76,7 @@ const stylesXml = () => `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>
 </styleSheet>`;
 
-function cell(ref, value, type, total) {
+export function cell(ref, value, type, total) {
   const style = { text: S.text, date: S.date, money: S.money, int: S.int, number: S.number }[type] ?? S.text;
   const totalStyle = { text: S.totalText, date: S.totalText, money: S.totalMoney, int: S.totalInt, number: S.totalNumber }[type] ?? S.totalText;
   const s = total ? totalStyle : style;

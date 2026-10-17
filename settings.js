@@ -1,14 +1,15 @@
 // Settings (superuser only). In order: users and access, which screens are switched on, the dashboard display, the feedback log, vehicles needed,
-// depots, typical fuel economy and the date format. Compliance types, templates and branding come later.
+// depots, typical fuel economy, the date format and, last, the exit pack (a full download of the organisation's data). Compliance types, templates and branding come later.
 import * as api from './api.js';
 import { state, can, ROLE_LABEL, ROLE_HINT, ROLE_ORDER, ACCESS_SUMMARY, MEMBER_STATUS_LABEL, OPTIONAL_SCREENS, screenOn, DASH_SECTIONS, dashLayout, menuLayout, MENU_STANDARD } from './state.js';
 import { html, mount, on, openModal, fieldsHtml, readForm, toast, loadingHtml, emptyHtml, fmtDateShort, formatDate, DATE_FORMATS, getDateFormat, setDateFormat } from './ui.js';
 import { CATEGORY_LABEL, WEEKDAYS } from './domain.js';
 import { DEFAULT_TYPICAL_MPG, DEFAULT_MILES_PER_KWH } from './tco.js';
 import { refreshNav } from './shell.js';
+import { mountExit } from './exitscreen.js';
 import { FB_CATEGORY, FB_STATUS, fbIsOpen, fbIsLate, fbRef, fbSort, fbStatusHtml, fbPriorityHtml, feedbackModal } from './feedback.js';
 
-const SECTIONS = [['set-users', 'Users and access'], ['set-screens', 'Screens'], ['set-dash', 'Dashboard display'], ['set-feedback', 'Feedback and changes'], ['set-needs', 'Vehicles needed'], ['set-depots', 'Depots'], ['set-fuel', 'Fuel economy'], ['set-dates', 'Date format']];
+const SECTIONS = [['set-users', 'Users and access'], ['set-screens', 'Screens'], ['set-dash', 'Dashboard display'], ['set-feedback', 'Feedback and changes'], ['set-needs', 'Vehicles needed'], ['set-depots', 'Depots'], ['set-fuel', 'Fuel economy'], ['set-dates', 'Date format'], ['set-exit', 'Exit pack']];
 
 export async function settingsView(main) {
   if (!can.configure) { mount(main, html`<header class="page-head"><h1>Settings</h1></header>${emptyHtml("You don't have access to settings", 'Only the superuser can change settings.')}`); return; }
@@ -211,7 +212,9 @@ export async function settingsView(main) {
           <button class="btn btn-primary" type="submit">Save date format</button>
         </form>
       </section>
-      <section class="later"><h2>Coming later</h2><p class="muted">Task types and reminder timings, message templates, and branding will be managed here.</p></section>`);
+      <section class="later"><h2>Coming later</h2><p class="muted">Task types and reminder timings, message templates, and branding will be managed here.</p></section>
+      <section class="settings-block" id="set-exit"><div class="section-head"><h2>Exit pack: a complete copy of your data</h2></div><div id="exit-box"></div></section>`);
+    mountExit(main.querySelector('#exit-box'));
     wireNeeds();
     drawFeedback();
     main.querySelector('#dash-form').addEventListener('submit', async (e) => {

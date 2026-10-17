@@ -28,7 +28,7 @@ Every file sits in one folder, so it uploads to GitHub with no folders to drag. 
 ## Files
 
 - `index.html`: the page. `config.js`: Supabase URL, public key and the sign-in screen branding.
-- `main.js`, `api.js`, `ui.js`, `actions.js`, `docs.js`, `exports.js`, `auth.js`, `shell.js`, `router.js`, `state.js`, `domain.js`: the app. `exports.js` builds the Excel and PDF files with no outside library.
+- `main.js`, `api.js`, `ui.js`, `actions.js`, `docs.js`, `exports.js`, `auth.js`, `shell.js`, `router.js`, `state.js`, `domain.js`: the app. `exports.js` builds the Excel and PDF files with no outside library. `exitpack.js`, `workbook.js`, `zipper.js` and `exitscreen.js` build the superuser's Exit pack (Settings, last section): a zip with a readable workbook, every table as CSV, all documents and a completeness check, optionally locked with an AES-256 passphrase. `migrations/20261017_log_export.sql` is a one-off database function that records each download in the audit log (apply it once; the pack works without it). Tests: `npm run test:exit`.
 - `dashboard.js`, `availability-chart.js`, `planner.js`, `rag.js`, `costs.js`, `tco.js` (the cost sums), `reports.js`, `insight.js`, `tasks.js`, `vehicles.js`, `availability.js`, `garages.js`, `drivers.js`, `incidents.js`, `insurance.js`, `settings.js`, `feedback.js`, `help.js`, `versions.js` (the version of each screen), `audit.js`, `history.js`, `placeholder.js`: one file per screen or shared screen logic.
 - `theme.css`, `app.css`: styles. `supabase.js`: the Supabase client library (version 2.117.2). `*.woff2`: fonts (Cascadia Code and Barlow Condensed, both open licence).
 
