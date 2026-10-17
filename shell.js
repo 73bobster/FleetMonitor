@@ -1,5 +1,5 @@
 // The signed-in frame: sidebar on desktop, tab bar on mobile, brand colours, org switcher.
-import { html, mount, on, icon, openModal, closeModal, logoImg, productLogo, wireLogos, setDateFormat } from './ui.js';
+import { html, mount, on, icon, openModal, closeModal, logoImg, productLogo, productMark, wireLogos, setDateFormat } from './ui.js';
 import { state, can, ROLE_LABEL, screenOn, menuLayout } from './state.js';
 import * as api from './api.js';
 import { dispatch } from './router.js';
@@ -76,7 +76,7 @@ export function renderShell({ onSwitchOrg, onSignOut }) {
           <button class="side-signout" type="button" data-action="signout">Sign out</button>
         </div>
       </aside>
-      <div class="content"><header class="mobile-brand"><a class="brand-link brand-stack" href="#/dashboard" aria-label="FleetRecord for ${org.name}: go to the dashboard">${productLogo()}${logoImg(logo, org.name)}</a></header><main id="main" tabindex="-1"></main><footer class="screen-foot" id="screen-foot"></footer></div>
+      <div class="content"><header class="mobile-brand"><a class="brand-link brand-row" href="#/dashboard" aria-label="FleetRecord for ${org.name}: go to the dashboard">${productMark()}${logoImg(logo, org.name)}</a></header><main id="main" tabindex="-1"></main><footer class="screen-foot" id="screen-foot"></footer></div>
       <nav class="tabbar" aria-label="Main">
         ${tabs().map((n) => navLink(n, 'tab-link'))}
         <button type="button" class="tab-link" data-action="more">${icon('more')}<span>More</span></button>
