@@ -1,7 +1,7 @@
 // Help: how to use FleetRecord. The basics, a guide to each screen, common questions, and the feedback a person has
 // sent. It only describes the screens this person can see: ones their user type allows and that are switched on.
 import * as api from './api.js';
-import { state, can, ROLE_LABEL, ROLE_HINT, screenOn } from './state.js';
+import { state, can, ROLE_LABEL, ROLE_HINT, screenOn, menuLayout } from './state.js';
 import { html, mount, on, loadingHtml } from './ui.js';
 import { versionOf } from './versions.js';
 import { feedbackModal, myFeedbackHtml } from './feedback.js';
@@ -47,6 +47,12 @@ const GUIDES = () => [
     can.write ? 'Choose "Report an incident" and say what happened, when, and which vehicle and driver. Add photos and documents once it is saved.' : 'Each incident shows what happened, the vehicle and driver, and the costs.',
     'A fine creates tasks for naming the driver and paying on time. An accident can create a task to tell the insurer.',
     can.write ? 'Record the repair cost, the excess and what the insurer paid as you learn them. They feed the dashboard, the reports and the cost of ownership.' : '',
+  ]],
+  ['service', 'Service / Repair', 'Vehicles that are at a garage or off the road now, and recording a new one.', [
+    'The list shows every vehicle that is out now: the reason, the garage, since when and when it is expected back. A date in red means it was due back and is not.',
+    can.write ? 'Choose "Record a service / repair" to send a vehicle for a service, MOT, tyres, repair or accident repair, or to book it in for a later date.' : '',
+    can.write ? 'Choose "Back in service" when a vehicle returns. If it is going to be longer, extend the expected return date instead.' : '',
+    'A vehicle that is out is counted as unavailable on the Dashboard and the Planner.',
   ]],
   ['garages', 'Garages', 'The garages you use, with their contact details.', [
     can.write ? 'Add a garage here once, then pick it whenever you book a visit. Archive a garage you no longer use: it stays on past visits.' : 'Garage visits themselves are shown on each vehicle\'s Availability tab.',
@@ -104,7 +110,10 @@ export async function helpView(main) {
   let mine = [];
   const loadMine = async () => { try { mine = (await api.listFeedback()).filter((i) => i.created_by === state.user?.id); } catch { mine = []; } };
   await loadMine();
-  const guides = GUIDES().filter(([id, , , , when]) => screenOn(id) && (!when || when()));
+  // In the order of the menu, which the superuser can change in Settings, Screens.
+  const menuPos = new Map(menuLayout().map((r, i) => [r.id, i]));
+  const guides = GUIDES().filter(([id, , , , when]) => screenOn(id) && (!when || when()))
+    .sort((a, b) => (menuPos.get(a[0]) ?? 99) - (menuPos.get(b[0]) ?? 99));
   const faqs = FAQS();
   const topic = (cls, summary, body) => html`<details class="help-topic ${cls}"><summary>${summary}</summary><div class="help-body">${body}</div></details>`;
 
@@ -120,7 +129,8 @@ export async function helpView(main) {
         <ol class="help-steps">
           <li><strong>Start on the Dashboard.</strong> The coloured tiles tell you at a glance whether anything needs attention.</li>
           <li><strong>Work the Tasks list from the top.</strong> ${can.write ? 'Deal with what is overdue first, then what is due soon. Recording a task as done sets its next date.' : 'It shows what is overdue and what is due soon.'}</li>
-          ${screenOn('planner') ? html`<li><strong>Look ahead on the Planner.</strong> It warns you about days when too few vehicles will be available.</li>` : ''}
+          ${screenOn('incidents') ? html`<li><strong>Record Incidents as they happen.</strong> ${can.write ? 'Accidents, damage and fines go here, so the tasks and costs that follow from them are not missed.' : 'It shows the accidents, damage and fines that have been recorded, and what they cost.'}</li>` : ''}
+          ${screenOn('service') ? html`<li><strong>Use Service / Repair for vehicles that are out.</strong> ${can.write ? 'Record a vehicle going to a garage or off the road, and mark it back in service when it returns.' : 'It shows which vehicles are at a garage or off the road now, and when they are due back.'}</li>` : ''}
           <li><strong>Keep the records up to date.</strong> ${can.write ? 'Mileage readings, garage visits, incidents and costs are what make everything else accurate.' : 'Mileage readings, garage visits, incidents and costs are entered by admins and fleet managers.'}</li>
         </ol>
         <p>You are signed in as <strong>${ROLE_LABEL[state.role]}</strong>. ${ROLE_HINT[state.role]}</p>

@@ -169,6 +169,8 @@ export const plate = (reg, category) => {
 // A logo image that falls back to the organisation's name as text if the picture cannot load.
 // The FleetRecord logo. It sits above the organisation's own logo and takes the same width (see .brand-stack in app.css).
 export const productLogo = () => html`<img class="logo-product" src="fleetrecord-logo.png" alt="FleetRecord" width="900" height="193">`;
+// The FleetRecord mark on its own (the favicon picture), for the phone header where there is no room for the full logo.
+export const productMark = () => html`<img class="logo-mark" src="fleetrecord-mark.png" alt="FleetRecord" width="323" height="240">`;
 export const logoImg = (url, name, extraClass = '') => (url
   ? html`<img class="logo" src="${url}" alt="${name}" data-name="${name}" data-class="${extraClass}" referrerpolicy="no-referrer">`
   : html`<span class="logo-text ${extraClass}">${name}</span>`);
