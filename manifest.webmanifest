@@ -1,6 +1,6 @@
 {
-  "name": "FleetMonitor",
-  "short_name": "FleetMonitor",
+  "name": "FleetRecord",
+  "short_name": "FleetRecord",
   "start_url": "./#/dashboard",
   "scope": "./",
   "display": "standalone",

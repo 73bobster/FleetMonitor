@@ -1,5 +1,5 @@
 // The signed-in frame: sidebar on desktop, tab bar on mobile, brand colours, org switcher.
-import { html, mount, on, icon, openModal, closeModal, logoImg, wireLogos, setDateFormat } from './ui.js';
+import { html, mount, on, icon, openModal, closeModal, logoImg, productLogo, wireLogos, setDateFormat } from './ui.js';
 import { state, can, ROLE_LABEL, screenOn, menuLayout } from './state.js';
 import * as api from './api.js';
 import { dispatch } from './router.js';
@@ -53,7 +53,7 @@ export function applyBrand(org) {
   const accent = org?.brand?.colours?.accent;
   if (luminance(accent) !== null) root.style.setProperty('--accent', accent);
   document.querySelector('meta[name="theme-color"]')?.setAttribute('content', primary || '#FF0066');
-  document.title = org ? `${org.name} fleet` : 'FleetMonitor';
+  document.title = org ? `${org.name} fleet` : 'FleetRecord';
   setDateFormat(org?.settings?.date_format);   // the organisation's date format, used by every screen and download
 }
 
@@ -67,7 +67,7 @@ export function renderShell({ onSwitchOrg, onSignOut }) {
   mount(document.getElementById('app'), html`
     <div class="shell">
       <aside class="side">
-        <div class="side-brand"><a class="brand-link" href="#/dashboard" aria-label="${org.name}: go to the dashboard">${logoImg(logo, org.name, 'side-name')}</a></div>
+        <div class="side-brand"><a class="brand-link brand-stack" href="#/dashboard" aria-label="FleetRecord for ${org.name}: go to the dashboard">${productLogo()}${logoImg(logo, org.name, 'side-name')}</a></div>
         <nav class="side-nav" aria-label="Main">${visibleNav().map((n) => navLink(n, 'side-link'))}</nav>
         <div class="side-foot">
           ${state.memberships.length > 1 ? html`<label class="side-switch"><span>Organisation</span><select id="org-switch">${state.memberships.map((m) => html`<option value="${m.organisation_id}" ${m.organisation_id === org.id ? 'selected' : ''}>${m.organisation.name}</option>`)}</select></label>` : ''}
@@ -76,7 +76,7 @@ export function renderShell({ onSwitchOrg, onSignOut }) {
           <button class="side-signout" type="button" data-action="signout">Sign out</button>
         </div>
       </aside>
-      <div class="content"><header class="mobile-brand"><a class="brand-link" href="#/dashboard" aria-label="${org.name}: go to the dashboard">${logoImg(logo, org.name)}</a></header><main id="main" tabindex="-1"></main><footer class="screen-foot" id="screen-foot"></footer></div>
+      <div class="content"><header class="mobile-brand"><a class="brand-link brand-stack" href="#/dashboard" aria-label="FleetRecord for ${org.name}: go to the dashboard">${productLogo()}${logoImg(logo, org.name)}</a></header><main id="main" tabindex="-1"></main><footer class="screen-foot" id="screen-foot"></footer></div>
       <nav class="tabbar" aria-label="Main">
         ${tabs().map((n) => navLink(n, 'tab-link'))}
         <button type="button" class="tab-link" data-action="more">${icon('more')}<span>More</span></button>
