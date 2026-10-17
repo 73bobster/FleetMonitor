@@ -440,3 +440,30 @@ export const milesInPeriod = async ({ from, to }) =>
   ok(await sb.rpc('mileage_in_period', { p_org: org(), p_from: from, p_to: to }));
 export const cancelBooking = async ({ eventId, notes }) =>
   ok(await sb.rpc('vehicle_cancel_booking', { p_event_id: eventId, p_notes: notes ?? null }));
+
+// ---- Exit pack readers (Settings, Exit pack) ----------------------------------------------------
+// scope: 'org' = rows with this organisation_id, 'self' = the organisation row itself, 'none' = shared reference tables.
+const scoped = (q, scope) => (scope === 'none' ? q : scope === 'self' ? q.eq('id', org()) : q.eq('organisation_id', org()));
+export async function exportTable(table, { key = 'id', scope = 'org' } = {}) {
+  const out = [];
+  for (let from = 0; ; from += 1000) {
+    const rows = ok(await scoped(sb.from(table).select('*'), scope).order(key).range(from, from + 999));
+    out.push(...rows);
+    if (rows.length < 1000) return out;
+  }
+}
+export async function countTable(table, { scope = 'org' } = {}) {
+  const res = await scoped(sb.from(table).select('*', { count: 'exact', head: true }), scope);
+  if (res.error) fail(res.error);
+  return res.count ?? 0;
+}
+export async function downloadDocument(path) {
+  const { data, error } = await sb.storage.from('fleet-documents').download(path);
+  if (error) fail(error);
+  return new Uint8Array(await data.arrayBuffer());
+}
+// Writes the audit entry for a download. Needs migrations/20261017_log_export.sql; without it the download still works.
+export async function logExport(details) {
+  const { error } = await sb.rpc('log_export', { p_org: org(), p_details: details });
+  return { recorded: !error, error: error?.message || '' };
+}

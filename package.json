@@ -3,6 +3,11 @@
   "private": true,
   "type": "module",
   "description": "FleetRecord front end. Plain HTML, CSS and JavaScript: there is no build step. package.json exists only for the tests.",
-  "scripts": { "test": "node tests/run.mjs" },
-  "devDependencies": { "jsdom": "^26.0.0" }
+  "scripts": {
+    "test": "node tests/run.mjs",
+    "test:exit": "node tests/exitpack.mjs /tmp/exit-pack-test && node tests/exitscreen.mjs && node tests/settings-exit.mjs"
+  },
+  "devDependencies": {
+    "jsdom": "^26.0.0"
+  }
 }

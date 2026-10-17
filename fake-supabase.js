@@ -11,7 +11,7 @@ export function makeFake(db, { session = null, password = 'correct-password' } =
 
   class Query {
     constructor(table) { this.table = table; this.op = 'select'; this.filters = []; this.orders = []; this.lim = null; this.payload = null; this.opts = {}; this.mode = null; }
-    select() { return this; }
+    select(_c, o) { if (o?.count) { this.wantCount = true; this.head = !!o.head; } return this; }
     insert(p) { this.op = 'insert'; this.payload = p; return this; }
     update(p) { this.op = 'update'; this.payload = p; return this; }
     upsert(p, o) { this.op = 'upsert'; this.payload = p; this.opts = o || {}; return this; }
@@ -21,6 +21,7 @@ export function makeFake(db, { session = null, password = 'correct-password' } =
     is(c, v) { this.filters.push((r) => (r[c] ?? null) === v); return this; }
     order(c, o) { this.orders.push([c, o?.ascending !== false]); return this; }
     limit(n) { this.lim = n; return this; }
+    range(a, b) { this.rng = [a, b]; return this; }
     single() { this.mode = 'single'; return this; }
     maybeSingle() { this.mode = 'maybe'; return this; }
     then(res, rej) { return this.run().then(res, rej); }
@@ -56,6 +57,8 @@ export function makeFake(db, { session = null, password = 'correct-password' } =
           });
         }
         if (this.lim) out = out.slice(0, this.lim);
+        if (this.wantCount) { const count = out.length; if (this.head) return { data: null, count, error: null }; if (this.rng) out = out.slice(this.rng[0], this.rng[1] + 1); return { data: out, count, error: null }; }
+        if (this.rng) out = out.slice(this.rng[0], this.rng[1] + 1);
       }
       if (this.mode === 'single') return out.length === 1 ? { data: out[0], error: null } : { data: null, error: { message: 'Expected one row', code: 'PGRST116' } };
       if (this.mode === 'maybe') return { data: out[0] ?? null, error: null };
@@ -86,6 +89,6 @@ export function makeFake(db, { session = null, password = 'correct-password' } =
       async resetPasswordForEmail(email, o) { db._log.push({ kind: 'reset', email, o }); return { error: null }; },
       async updateUser() { return { error: null }; },
     },
-    storage: { from: () => ({ getPublicUrl: (p) => ({ data: { publicUrl: `https://files.test/${p}` } }) }) },
+    storage: { from: () => ({ download: async (p) => { const f = db._files?.[p]; return f ? { data: new Blob([f]), error: null } : { data: null, error: { message: 'Object not found' } }; }, getPublicUrl: (p) => ({ data: { publicUrl: `https://files.test/${p}` } }) }) },
   };
 }
