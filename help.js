@@ -1,4 +1,4 @@
-// Help: how to use FleetMonitor. The basics, a guide to each screen, common questions, and the feedback a person has
+// Help: how to use FleetRecord. The basics, a guide to each screen, common questions, and the feedback a person has
 // sent. It only describes the screens this person can see: ones their user type allows and that are switched on.
 import * as api from './api.js';
 import { state, can, ROLE_LABEL, ROLE_HINT, screenOn } from './state.js';
@@ -116,7 +116,7 @@ export async function helpView(main) {
     <section class="help-section" data-help>
       <h2>The basics</h2>
       <div class="help-basics">
-        <p>FleetMonitor keeps ${state.org.name}'s vehicles and drivers legal, available and affordable. It holds every date that matters, tells you what is due, shows which vehicles you can use, and adds up what the fleet costs.</p>
+        <p>FleetRecord keeps ${state.org.name}'s vehicles and drivers legal, available and affordable. It holds every date that matters, tells you what is due, shows which vehicles you can use, and adds up what the fleet costs.</p>
         <ol class="help-steps">
           <li><strong>Start on the Dashboard.</strong> The coloured tiles tell you at a glance whether anything needs attention.</li>
           <li><strong>Work the Tasks list from the top.</strong> ${can.write ? 'Deal with what is overdue first, then what is due soon. Recording a task as done sets its next date.' : 'It shows what is overdue and what is due soon.'}</li>

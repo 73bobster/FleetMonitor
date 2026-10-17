@@ -239,7 +239,7 @@ export function disposeModal(v) {
   ];
   const dlg = openModal({
     title: `Dispose of ${formatReg(v.registration)}`, submitLabel: 'Dispose of vehicle', danger: true,
-    body: html`<p class="muted">The vehicle stays in FleetMonitor with all its records and history. This ends its current driver assignment and insurance cover, and adds a task to tell your insurer.</p>${fieldsHtml(specs, { disposed_date: todayStr() })}`,
+    body: html`<p class="muted">The vehicle stays in FleetRecord with all its records and history. This ends its current driver assignment and insurance cover, and adds a task to tell your insurer.</p>${fieldsHtml(specs, { disposed_date: todayStr() })}`,
     onSubmit: async (f) => {
       const x = readForm(f, specs);
       await api.disposeVehicle({ id: v.id, date: x.disposed_date, reason: x.disposal_reason, salePrice: x.sale_price, soldTo: x.sold_to, notes: x.disposal_notes });

@@ -309,7 +309,7 @@ export async function settingsView(main) {
         <div class="field"><label for="invite-link">Invitation link</label><input type="text" id="invite-link" readonly value="${link}"></div>
         <p class="invite-actions"><button type="button" class="btn btn-primary" data-copy>Copy link</button>
           <a class="btn" href="mailto:${i.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}">Email it</a></p>
-        <p class="hint">FleetMonitor does not send the email itself. "Email it" opens your own mail app with the message written for you.</p>`,
+        <p class="hint">FleetRecord does not send the email itself. "Email it" opens your own mail app with the message written for you.</p>`,
     });
     const box = dlg.querySelector('#invite-link');
     box.addEventListener('focus', () => box.select());

@@ -15,7 +15,7 @@ export async function auditView(main) {
 
   mount(main, html`
     <header class="page-head"><h1>Audit log</h1></header>
-    <p class="muted">Every change made in FleetMonitor: who made it, when, and what it was. It cannot be edited or deleted. Click a number plate, a driver or an "Open" link to go to the record.</p>
+    <p class="muted">Every change made in FleetRecord: who made it, when, and what it was. It cannot be edited or deleted. Click a number plate, a driver or an "Open" link to go to the record.</p>
     <form class="filters audit-filters" id="audit-form">
       <div class="field"><label for="a-from">From</label><input type="date" id="a-from" value="${ui.from}"></div>
       <div class="field"><label for="a-to">To</label><input type="date" id="a-to" value="${ui.to}"></div>

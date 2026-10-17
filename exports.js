@@ -201,7 +201,7 @@ export function buildPdf(model, generated = new Date()) {
     objs[cn] = { stream };
   });
   objs[2] = `<< /Type /Pages /Kids [${kids.join(' ')}] /Count ${pages.length} >>`;
-  objs[5 + pages.length * 2] = `<< /Title (${esc(model.title)}) /Producer (FleetMonitor) >>`;
+  objs[5 + pages.length * 2] = `<< /Title (${esc(model.title)}) /Producer (FleetRecord) >>`;
   const infoNum = 5 + pages.length * 2;
 
   const chunks = []; const offsets = []; let pos = 0;

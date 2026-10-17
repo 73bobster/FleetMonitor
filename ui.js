@@ -167,6 +167,8 @@ export const plate = (reg, category) => {
 };
 
 // A logo image that falls back to the organisation's name as text if the picture cannot load.
+// The FleetRecord logo. It sits above the organisation's own logo and takes the same width (see .brand-stack in app.css).
+export const productLogo = () => html`<img class="logo-product" src="fleetrecord-logo.png" alt="FleetRecord" width="900" height="193">`;
 export const logoImg = (url, name, extraClass = '') => (url
   ? html`<img class="logo" src="${url}" alt="${name}" data-name="${name}" data-class="${extraClass}" referrerpolicy="no-referrer">`
   : html`<span class="logo-text ${extraClass}">${name}</span>`);

@@ -1,6 +1,6 @@
 // Signed-out screens: sign in, create account (with invitation), reset password, join with a code.
 import * as api from './api.js';
-import { html, mount, on, plate, toast, logoImg, wireLogos } from './ui.js';
+import { html, mount, on, plate, toast, logoImg, productLogo, wireLogos } from './ui.js';
 import { applyBrand } from './shell.js';
 import { CONFIG } from './config.js';
 import { versionOf } from './versions.js';
@@ -16,7 +16,7 @@ function frame(inner) {
         <p class="auth-line">Fleet compliance for ${CONFIG.brand?.name || 'your business'}, in one place.</p>
         <div class="auth-plates">${plate('AB12 CDE')}${plate('FM26 MOT')}${plate('XY74 LIC')}</div>
       </aside>
-      <main class="auth-main" id="main"><div class="auth-card">${logoImg(CONFIG.brand?.logoUrl, CONFIG.brand?.name || 'FleetMonitor')}${inner}<p class="auth-version">${versionOf('signin')}</p></div></main>
+      <main class="auth-main" id="main"><div class="auth-card"><div class="brand-stack">${productLogo()}${logoImg(CONFIG.brand?.logoUrl, CONFIG.brand?.name || 'FleetRecord')}</div>${inner}<p class="auth-version">${versionOf('signin')}</p></div></main>
     </div>`);
   wireLogos(root());
 }

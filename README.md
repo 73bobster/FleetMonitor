@@ -1,4 +1,4 @@
-# FleetMonitor app (flat layout)
+# FleetRecord app (flat layout)
 
 Every file sits in one folder, so it uploads to GitHub with no folders to drag. Keep `index.html` at the root of the site.
 
